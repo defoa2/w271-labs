@@ -123,13 +123,14 @@ For example, there are 264 observations for gender = "F" and party = "D". Becaus
 
 ```{r}
 cont.table <- xtabs(formula = count ~ party + ideol.order + gender, data = voters)
-#cont.table
+cont.table
 flattened <- ftable(x = cont.table, row.vars = c("gender", "party"), col.vars = "ideol.order")
 flatdata <- as.data.frame(flattened)
 pihat <- predict(object = multi.mod, newdata = flatdata[1:4,], type = "probs")
 estprob <- data.frame(gender = flatdata[1:4,], party = flatdata[1:4, 2], round(pihat, 4))
-estcounts <- estprob[, 6:10] * flattened[, 0:5]
-estcounts
+estcounts <- estprob[, 6:10] * rowSums(flattened[, 0:5])
+est_counts_labeled <- data.frame(gender = flatdata[1:4,1], party = flatdata[1:4, 2], round(estcounts, 4))
+est_counts_labeled
 ```
 
 
@@ -139,6 +140,7 @@ estcounts
 
 ```{r a contingency table with estimated counts}
 pihat
+estprob
 #v.table
 #coefficients(multi.mod)
 #pi.hat.ord <- predict(object = multi.mod, type = "probs")
