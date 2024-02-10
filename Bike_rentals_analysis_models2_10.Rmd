@@ -1,0 +1,308 @@
+---
+title: "W271 Group Lab"
+subtitle: "Bike share demand"
+author: "Please fill in with your names."
+output: bookdown::pdf_document2
+fontsize: 11pt
+geometry: margin=1in
+---
+
+# Introduction (5 points)
+
+**Complete the following task. In your final submission, please remove this question prompt so that your report reads as a report.**
+
+The `SeoulBikeData` data set measures the number of bike rentals (bikers) per hour in Seoul, South Korea, from December 1, 2017, to November 30, 2018. There are 8760 records/observations and 14 variables in this data set. The ‘Seoul Bike Sharing Demand Data Set’ can be downloaded from UC Irvine Machine Learning Repository: https://archive.ics.uci.edu/ml/datasets/Seoul+Bike+Sharing+Demand
+
+Initiate your analysis by formulating a hypothesis related to bike share demand that can be tested using a regression model. This hypothesis aims to provide decision-makers with insights into the factors influencing bike usage and demand, facilitating the optimal availability of rental bikes to the public when needed.
+
+<!-- should we only do one important hypothesis test - maybe related to model building? -->
+Hypothesis:
+1. 
+
+How we will test:
+ 
+1. $$H_0: \beta_{season}, \beta_{time.of.day}, \beta_{holiday}, \beta_{tempcat} = 0$$
+    $$H_A: \beta_{season}, \beta_{time.of.day}, \beta_{holiday}, \beta_{tempcat} \ne 0$$
+    
+This hypothesis test tests whether or not season affects demand, so that the owners can decide when to start hiring for high peak seasons
+
+
+
+# Data (20 points)
+```{r}
+seoul.bike <- read.csv("SeoulBikeData.csv",
+                         header=T,na.strings=c("","NA")) 
+idx <- which(seoul.bike$Functioning.Day == "Yes")
+seoul.bike1 <- seoul.bike[idx, ]
+```
+
+
+## Description (5 points)
+
+**Complete the following task. In your final submission, please remove this question prompt so that your report reads as a report.**
+
+Describe the data that you are using. How is this data generated, what is the sampling process that brought it to your availability, etc. If it is helpful, you might describe the population (i.e. the Random Variables) that exist and how samples are produced from these random variables.
+
+## EDA (15 points)
+
+**Complete the following task. In your final submission, please remove this question prompt so that your report reads as a report.**
+
+Examine the dataset and investigate anomalies, missing values, and convert variables when necessary for future analysis.
+
+Conduct a thorough EDA of the data set, giving special attention to the relationships relevant to your hypothesis.
+
+-   This should include both graphical and tabular analysis as taught in this course.
+-   Since the report has a page-limit, you will have to be selective when choosing visuals to illustrate your key points, associated with a concise explanation of the visuals.
+```{r}
+# creating new variable time of day from bike
+seoul.bike1$time.of.day <- ifelse(seoul.bike1$Hour <= 6, "night", seoul.bike1$Hour)
+seoul.bike1$time.of.day <- ifelse(seoul.bike1$Hour > 6, "morning", seoul.bike1$time.of.day)
+seoul.bike1$time.of.day <- ifelse(seoul.bike1$Hour > 12, "afternoon", seoul.bike1$time.of.day)
+seoul.bike1$time.of.day <- ifelse(seoul.bike1$Hour > 17, "evening", seoul.bike1$time.of.day)
+seoul.bike1$time.of.day <- as.factor(seoul.bike1$time.of.day)
+```
+
+```{r}
+summary(seoul.bike1$Temperature)
+summary(seoul.bike1$Rented.Bike.Count)
+summary(seoul.bike1$Hour)
+summary(seoul.bike1$Solar.Radiatio)
+summary(seoul.bike1$Humidity)
+summary(seoul.bike1$Date)
+summary(seoul.bike1$Wind.speed)
+summary(seoul.bike1$Visibility)
+summary(seoul.bike1$Dew.point.temperature)
+summary(seoul.bike1$Rainfall)
+summary(seoul.bike1$Snowfall)
+seoul.bike1$Seasons <- as.factor(seoul.bike1$Seasons)
+summary(seoul.bike1$Seasons)
+seoul.bike1$Holiday <- as.factor(seoul.bike1$Holiday)
+summary(seoul.bike1$Holiday)
+seoul.bike1$Functioning.Day <- as.factor(seoul.bike1$Functioning.Day)
+summary(seoul.bike1$Functioning.Day)
+
+
+hist(seoul.bike1$Rented.Bike.Count)
+
+summary(seoul.bike1$time.of.day)
+head(seoul.bike1)
+```
+
+
+```{r}
+
+# creating new variable time of day from bike
+seoul.bike1$TempF <- seoul.bike1$Temperature.C. * (9/5) + 32
+
+# -1, 103
+max(seoul.bike1$TempF)
+seoul.bike1$TempCat <- ifelse(seoul.bike1$TempF <= 20, "below 20", seoul.bike1$TempF)
+seoul.bike1$TempCat <- ifelse(seoul.bike1$TempF > 20, "21-40", seoul.bike1$TempCat)
+seoul.bike1$TempCat <- ifelse(seoul.bike1$TempF > 40, "41-60", seoul.bike1$TempCat)
+seoul.bike1$TempCat <- ifelse(seoul.bike1$TempF > 60, "61-80", seoul.bike1$TempCat)
+seoul.bike1$TempCat <- ifelse(seoul.bike1$TempF > 80, "81-100", seoul.bike1$TempCat)
+seoul.bike1$TempCat <- ifelse(seoul.bike1$TempF> 100, "over 100", seoul.bike1$TempCat)
+seoul.bike1$TempCat <- as.factor(seoul.bike1$TempCat)
+summary(seoul.bike1$TempCat)
+dim(seoul.bike1)
+```
+```{r}
+tempcat_bar <- ggplot(data=seoul.bike1, aes(x=TempCat, y=Rented.Bike.Count)) + geom_bar(stat = 'identity')
+tempcat_bar
+```
+
+
+
+```{r}
+boxplot(seoul.bike1$Temperature)
+```
+
+
+```{r}
+library(corrplot)
+corrplot(cor(seoul.bike1[,c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11)]))
+```
+
+
+### print out lots of graph and decide on 3 for final paper
+
+
+```{r}
+hist(seoul.bike1$Solar.Radiation..MJ.m2.)
+```
+
+```{r}
+p <- ggplot(aes(x=Temperature, y = Rented.Bike.Count, color = time.of.day), data = seoul.bike1) + geom_point()
+p
+```
+
+```{r}
+p <- ggplot(data=seoul.bike1, aes(x=time.of.day, y=Rented.Bike.Count)) + geom_bar(stat = 'identity')
+p
+```
+
+
+### adding in nora's graphs
+
+```{r}
+p <- ggplot(aes(x= seoul.bike1$'Temperature.C', y = seoul.bike1$'Rented Bike Count', color = Seasons), data = seoul.bike1) + geom_point()
+p
+```
+
+```{r}
+ggplot(seoul.bike1, aes(x = seoul.bike1$Seasons, y = seoul.bike1$`Rented Bike Count`, fill = seoul.bike1$time.of.day)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Bike Counts by Month and Time of Day",
+       x = "Month", y = "Bike Counts",
+       fill = "Time of Day") +
+  theme_minimal()
+```
+
+```{r}
+ggplot(seoul.bike1, aes(x = seoul.bike1$Holiday, y = seoul.bike1$`Rented Bike Count`)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Bike Counts by Holiday or No Holiday",
+       x = "Month", y = "Bike Counts",
+       fill = "Time of Day") +
+
+  theme_minimal()
+```
+
+
+
+# Model Development (40 points)
+
+## Poisson regression (10 points)
+
+**Complete the following task. In your final submission, please remove this question prompt so that your report reads as a report.**
+
+Estimate a simple poisson regression model (`model_poisson_1`) that includes variables as linear terms in the model based on what is essential for your hypothesis. Evaluate, using likelihood ratio tests and the statistical significance of each explanatory variable in the model. Also evaluate, using the context and data understanding that you have created in the Data section of this report, the practical significance of each explanatory variable in the model.
+
+```{r}
+pos.mod <- glm(formula = Rented.Bike.Count ~ time.of.day +  TempCat + Seasons + Holiday, family = poisson(link = "log"), data = seoul.bike1)
+summary(pos.mod)
+```
+
+## Model Comparison (10 points)
+
+Expand your initial poisson model through a two-step process:
+
+- Incorporate additional variables from the dataset to avoid potential omitted variable bias. (`model_poisson_2`)
+
+- Introduce quadratic terms or interactions when they can potentially explain variations in bike rental demand. For instance, you might consider assessing whether the effect of Hour on bike demand differs between weekdays and weekends. (`model_poisson_3`)
+
+Finally, use three information criteria for the three models (`model_poisson_1`, `model_poisson_2`, `model_poisson_3`) and rank the models based on each criterion. Are the results consistent? Why or why not?
+
+
+```{r}
+pos.mod2 <- glm(formula = Rented.Bike.Count ~ time.of.day +  TempCat + Seasons +Holiday + Solar.Radiation..MJ.m2. + Rainfall.mm. + Snowfall..cm., family = poisson(link = "log"), data = seoul.bike1)
+summary(pos.mod2)
+
+
+```
+```{r}
+which(is.na(seoul.bike1$Rainfall.mm.))
+```
+
+
+```{r}
+pos.mod3 <- glm(formula = Rented.Bike.Count ~ time.of.day +  TempCat + Seasons +Holiday 
+                + Solar.Radiation..MJ.m2. + Rainfall.mm. + Snowfall..cm. + I(Hour**2) +  I(TempF**2)  + I(Solar.Radiation..MJ.m2.**2) + I(Rainfall.mm.**2) + I(Snowfall..cm.**2) +
+                  TempCat:Seasons + TempCat:time.of.day + Holiday:time.of.day,
+                family = poisson(link = "log"), data = seoul.bike1)
+summary(pos.mod3)
+
+```
+```{r}
+Anova(pos.mod, test = "LR")
+Anova(pos.mod2, test = "LR")
+Anova(pos.mod3, test = "LR")
+```
+```{r}
+AIC.tab <- data.frame(mod1 = AIC(pos.mod), mod.2 = AIC(pos.mod2), mod.3 = AIC(pos.mod3))
+AIC.tab
+```
+Model 3 performs the best, then model 2, then model 1.
+## Model Assessment (10 points)
+
+**Complete the following task. In your final submission, please remove this question prompt so that your report reads as a report.**
+
+Use suitable tools like residual or standardized residual plots to assess if your final model is a good approximation of the data. Additionally, check the results for indications of potential overdispersion.
+
+- How would you address any potential issues, including any overdispersion?
+- Produce an adjusted version of your best model that accounts for issues noted above.
+
+
+```{r}
+pred1 <- predict(pos.mod3, type = "response")
+res1 <- residuals(pos.mod3, type = "pearson")
+s.res1 <- rstandard(pos.mod3, type = "pearson")
+lin.pred1 <- pos.mod3$linear.predictors
+
+dfassess1 <- data.frame(seoul.bike1, pred1, res1, s.res1, lin.pred1)
+
+dfassess1 %>%
+  ggplot(aes(x = dfassess1$pred1, y = dfassess1$s.res1)) + 
+  geom_point() + 
+  geom_hline(yintercept = c(3, 2, 0, -2, -3), color = "red", linetype = "dashed") + 
+  geom_smooth(se = FALSE) +
+  ggtitle("Standardized residuals vs fitted values")
+
+
+dfassess1 %>%
+  ggplot(aes(x = dfassess1$lin.pred1, y = dfassess1$s.res1)) + 
+  geom_point() + 
+  geom_hline(yintercept = c(3, 2, 0, -2, -3), color = "red", linetype = "dashed") + 
+  geom_smooth(se = FALSE) +
+  ggtitle("Standardized residuals vs linear predictors")
+```
+
+```{r}
+#Goodness of Fit
+pearson_stat <- su
+```
+
+
+```{r}
+dispersiontest(pos.mod3)
+```
+
+
+## Alternative Specification (10 points)
+
+**Complete the following task. In your final submission, please remove this question prompt so that your report reads as a report.**
+
+```{r}
+quasi <- glm(formula = Rented.Bike.Count ~ time.of.day +  TempCat + Seasons +Holiday 
+                + Solar.Radiation..MJ.m2. + Rainfall.mm. + Snowfall..cm. + I(Hour**2) +  I(TempF**2)  + I(Solar.Radiation..MJ.m2.**2) + I(Rainfall.mm.**2) + I(Snowfall..cm.**2) +
+                  TempCat:Seasons + TempCat:time.of.day + Holiday:time.of.day, data = seoul.bike1, family = quasipoisson)
+summary(quasi)
+```
+```{r}
+
+negbi = glm.nb(formula = Rented.Bike.Count ~ time.of.day +  TempCat + Seasons + Holiday +
+                  TempCat:Seasons + TempCat:time.of.day + Holiday:time.of.day, data = seoul.bike1)
+Anova(negbi)
+```
+
+
+Using the same set of explanatory variables from your final model, estimate a linear regression model. Examine the summary of the model and interpret the coefficients. Obtain fitted values from both OLS and Poisson regression models and plot them. Discuss which regression model, linear or Poisson, is more suitable for this case and explain why.
+
+# Conlusion (5 points)
+
+**Complete the following task. In your final submission, please remove this question prompt so that your report reads as a report.**
+
+In conclusion, summarize your entire work to leave a lasting impression on the reader. Ensure you:
+
+- Restate the main hypothesis or research question.
+
+- Report OLS, Poisson, or any other regressions you estimated.
+  
+- Summarize key findings.
+  
+- Discuss implications.
+  
+- Address limitations.
+
+
+
