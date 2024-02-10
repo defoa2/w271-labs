@@ -55,7 +55,7 @@ Analyze the relationships between political ideology and political party and gen
 ```{r Create a bar plot using the count variable}
 p <- ggplot(data=pol_ideol, aes(x=ideol_levels, y=count))+
   geom_bar(stat='identity') +
-  ggtitle("Political Ideology Histogram") + 
+  ggtitle("Political Ideology Distribution") + 
   xlab("Ideology") + ylab("Frequency")
 p
 ```
@@ -63,7 +63,7 @@ p
 ```{r}
 p <- ggplot(data=pol_ideol, aes(x=party, y=count))+
   geom_bar(stat='identity') +
-  ggtitle("Political Ideology Histogram") + 
+  ggtitle("Party Distribution") + 
   xlab("Ideology") + ylab("Frequency")
 p
 ```
@@ -71,10 +71,23 @@ p
 ```{r}
 p <- ggplot(data=pol_ideol, aes(x=gender, y=count))+
   geom_bar(stat='identity') +
-  ggtitle("Political Ideology Histogram") + 
+  ggtitle("Gender Distribution") + 
   xlab("Ideology") + ylab("Frequency")
 p
 ```
+
+```{r}
+ggplot(pol_ideol, aes(fill=party, y=count, x=ideol_levels)) + 
+    geom_bar(position="dodge", stat="identity") +
+    ggtitle("Party and Ideologies") +
+    xlab("Ideologies")
+
+ggplot(pol_ideol, aes(fill=gender, y=count, x=ideol_levels)) + 
+    geom_bar(position="dodge", stat="identity") +
+    ggtitle("Gender and Ideologies") +
+    xlab("Ideologies")
+```
+
 
 ```{r Create a contingency table and test for the independence}
 # independence of political ideology and gender
@@ -95,8 +108,7 @@ test1
 
 ```
 
-The p-values for gender and party are both small, so independence is rejected for gender and party.
-
+The p-values for gender and party are both small, so the null hypothesis is that party and gender are independent from ideology is rejected, and we can conclude that ideology is dependent on these two variables.
 
 ## Regression analysis  (5 points)
 
@@ -107,23 +119,25 @@ Also, test whether the proportional odds assumption in the ordinal model is sati
 ```{r multinomial and ordinal regressions}
 mod.nomial <- multinom(ideol_levels ~ party + gender + party:gender, data=pol_ideol, weights = count)
 summary(mod.nomial)
+mod.ord <- clm(ideol_levels ~ party + gender, data=pol_ideol, weights = count)
+summary(mod.ord)
 ```
 
 
 ```{r LRTs}
 Anova(mod.nomial, test = "LR")
+Anova(mod.ord, test = "Chisq")
 ```
 
 Using Anova to test each of the explanatory variables, the p-value is small for party, so we can conclude that is has an effect on ideology. The p-values were large for gender and the party-gender interaction effect, so for these variables we are unable to reject the null hypothesis.
 
-```{r proportional odds assumption}
-mod.ord <- clm(ideol_levels ~ party + gender, data=pol_ideol, weights = count)
+For the ordinal model, the p-value for party, gender and its interaction was small, so these variables do have an affect on ideology under this model.
 
+```{r proportional odds assumption}
 nominal_test(mod.ord)
 ```
 
 The p-values for all of the variables are large, we cannot reject the null hypothesis for proportional odds, so the ordinal model is not valid and we should use the multinomial model.  
-
 
 ## Estimated probabilities  (5 points)
 
@@ -170,11 +184,20 @@ colnames(vl.dat) <- c("F", "M")
 rownames(vl.dat) <- c("D", "R")
 vl.dat
 
+# VL contingency
+vl.prob <- unname(tab[, 1])
+vl.dat <- matrix(round(c(vl.prob[1]*fd.sum, vl.prob[2]*fr.sum, vl.prob[3]*md.sum, vl.prob[4]*mr.sum)), nrow = 2, ncol = 2)
+colnames(vl.dat) <- c("F", "M")
+rownames(vl.dat) <- c("D", "R")
+print("VL contingency table")
+vl.dat
+
 # SL contingency
 sl.prob <- unname(tab[, 2])
 sl.dat <- matrix(round(c(sl.prob[1]*fd.sum, sl.prob[2]*fr.sum, sl.prob[3]*md.sum, sl.prob[4]*mr.sum)), nrow = 2, ncol = 2)
 colnames(sl.dat) <- c("F", "M")
 rownames(sl.dat) <- c("D", "R")
+print("SL contingency table")
 sl.dat
 
 # M contingency
@@ -182,6 +205,7 @@ m.prob <- unname(tab[, 3])
 m.dat <- matrix(round(c(m.prob[1]*fd.sum, m.prob[2]*fr.sum, m.prob[3]*md.sum, m.prob[4]*mr.sum)), nrow = 2, ncol = 2)
 colnames(m.dat) <- c("F", "M")
 rownames(m.dat) <- c("D", "R")
+print("M contingency table")
 m.dat
 
 # SC contingency
@@ -189,6 +213,7 @@ sc.prob <- unname(tab[, 4])
 sc.dat <- matrix(round(c(sc.prob[1]*fd.sum, sc.prob[2]*fr.sum, sc.prob[3]*md.sum, sc.prob[4]*mr.sum)), nrow = 2, ncol = 2)
 colnames(sc.dat) <- c("F", "M")
 rownames(sc.dat) <- c("D", "R")
+print("SC contingency table")
 sc.dat
 
 # VC contingency
@@ -196,8 +221,19 @@ vc.prob <- unname(tab[, 5])
 vc.dat <- matrix(round(c(vc.prob[1]*fd.sum, vc.prob[2]*fr.sum, vc.prob[3]*md.sum, vc.prob[4]*mr.sum)), nrow = 2, ncol = 2)
 colnames(vc.dat) <- c("F", "M")
 rownames(vc.dat) <- c("D", "R")
+print("VC contingency table")
 vc.dat
+```
 
+```{r echo=FALSE}
+# checking calculations on contingency table
+# fd.sum
+# fr.sum
+# md.sum
+# mr.sum
+# 
+# pred.f.d*fd.sum
+# pred.m.d*md.sum
 ```
 
 ```{r goodness of fit test for observed vs. expected}
