@@ -288,6 +288,28 @@ Anova(negbi)
 
 Using the same set of explanatory variables from your final model, estimate a linear regression model. Examine the summary of the model and interpret the coefficients. Obtain fitted values from both OLS and Poisson regression models and plot them. Discuss which regression model, linear or Poisson, is more suitable for this case and explain why.
 
+```{r}
+lin.reg.mod <- lm(formula = Rented.Bike.Count ~ time.of.day +  TempCat + Seasons + Holiday +
+                  TempCat:Seasons + TempCat:time.of.day + Holiday:time.of.day, data = seoul.bike1)
+summary(lin.reg.mod)
+```
+```{r}
+## calculate and store predicted values
+fitted_values_lin <- predict(lin.reg.mod, type="response")
+fitted_values_pos <- predict(negbi, type="response")
+## Create the plot
+
+ggplot(seoul.bike1) +
+  geom_point(aes(x = Rented.Bike.Count, y = fitted_values_lin)) +
+  labs(x = "Rented Bike Count", y = "Expected Rented Bike Count Linear Model")
+
+ggplot(seoul.bike1) +
+  geom_point(aes(x = Rented.Bike.Count, y = fitted_values_pos)) +
+  labs(x = "Rented Bike Count", y = "Expected Rented Bike Count Poisson Model")
+
+```
+
+
 # Conlusion (5 points)
 
 **Complete the following task. In your final submission, please remove this question prompt so that your report reads as a report.**
