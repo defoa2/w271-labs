@@ -211,9 +211,18 @@ chisq.test(x = est.count, correct = FALSE)
 
 ## Odds ratios and confidence intervals  (8 points)
 
-To better understand relationships between the explanatory variables and the response, compute odds ratios and their confidence intervals from the estimated models and interpret them.
+To better understand relationships between the explanatory variables and the response, compute odds ratios and their confidence intervals from the estimated models and interpret them.\
 
-```{r Odds ratios and confidence intervals}
+*Comment*: The odds ratios for a given variable, depend on the category of comparison (e.g., VL, SL, N, SC, or VL). In the multinomial logit model, the left-out gender category was female and the left-out party category was democrat. The comparison level for ideology was 'Neutral.' We compare the odds of the different coefficients for the coefficients from each VL, SL, SC, and VL level. \
+Assuming the model specification 
+$\log(\pi_{j}/\pi_{1}) = \beta_{j0} + \beta_{jGender}x_{Gender} + \beta_{jParty} + \beta_{jGender*Party}$ where j = SC, SL, VC, VL. \
+
+The Odds Ratio for male versus female for the each jth level is equal to  $\frac{exp(\beta_{j0}+\beta_{j1}*(gender+c)+\beta_{j3}*party*(gender+c))}{exp(\beta_{j0}+\beta_{j1}*gender+\beta_{j3}*party*gender)} = exp(\beta_{j1}*c+\beta_{j3}*party*c)$ where c = 1 for a categorical variable. Further, gender will be equal to one as it is also a categorical variable. \
+
+The Odds Ratio for republican versus democrat for each jth level is equal to $\frac{exp(\beta_{j0}+\beta_{j2}*(party+c)+\beta_{j3}*gender*(party+c))}{exp(\beta_{j0}+\beta_{j2}*party+\beta_{j3}*gender*party)} = exp(\beta_{j2}*c+\beta_{j3}*gender*c)$ where c = 1. 
+    
+
+```{r Odds ratios and confidence intervals, echo = FALSE}
 #Odds Ratios 
 levels(pol_ideol_data$ideol)
 sum_mlmodel <- summary(mlmodel)
@@ -223,7 +232,7 @@ sum_mlmodel
 print("beta_hats")
 beta_hats
 # Neutral is comparison category 
-  #Odds of for male (and republican)
+  
 #beta.hat_jr for r = 1,...6 and j = 2,3,4,5
 beta.hat.sc <- beta_hats[1,2:4]
 beta.hat.sl <- beta_hats[2,2:4]
@@ -280,6 +289,31 @@ vl.beta.rep.fem <- exp(beta.hat.vl[2])
 vl.beta.dem.male <- exp(beta.hat.vl[3])
 #vl.beta.dem.fem <- 
   
-  
+
 
 ```
+Table Odds Ratios for Gender
+```{r}
+ideology_labels <- c('SC', 'SC', 'SC', 'SL', 'SL', 'SL', 'VC', 'VC', 'VC', 'VL', 'VL', 'VL')
+gender_labels <- c('Male','Male', 'Female', 'Male','Male', 'Female', 'Male','Male', 'Female', 'Male','Male', 'Female')
+party_labels <- c('Rep', 'Dem', 'Rep', 'Rep', 'Dem', 'Rep', 'Rep', 'Dem', 'Rep', 'Rep', 'Dem', 'Rep' )
+odds_ratio_gender <- c(sc.beta.male.rep, sc.beta.male.dem ,sc.beta.fem.rep, sl.beta.male.rep, sl.beta.male.dem, sl.beta.fem.rep, vc.beta.male.rep, vc.beta.male.dem, vc.beta.fem.rep, vl.beta.male.rep, vl.beta.male.dem, vl.beta.fem.rep)
+
+gender_odds <- data.frame(Ideology = ideology_labels, Gender = gender_labels, Party = party_labels, OR.hat = round(c(sc.beta.male.rep, sc.beta.male.dem ,sc.beta.fem.rep, sl.beta.male.rep, sl.beta.male.dem, sl.beta.fem.rep, vc.beta.male.rep, vc.beta.male.dem, vc.beta.fem.rep, vl.beta.male.rep, vl.beta.male.dem, vl.beta.fem.rep), 4))
+gender_odds
+```
+Table of Odds Ratio for Party 
+```{r}
+
+odds_ratio_party <- c(sc.beta.rep.male, sc.beta.rep.fem,sc.beta.dem.male, sl.beta.rep.male, sl.beta.rep.fem, sl.beta.dem.male, vc.beta.rep.male, vc.beta.rep.fem, vc.beta.dem.male, vl.beta.rep.male, vl.beta.rep.fem, vl.beta.dem.male)
+
+party_table_party_labels <- c('Republican', 'Republican', 'Democrat', 'Republican', 'Republican', 'Democrat', 'Republican', 'Republican', 'Democrat', 'Republican', 'Republican', 'Democrat' )
+
+party_table_gender_labels <- c('Male', 'Female', 'Male', 'Male', 'Female', 'Male','Male', 'Female', 'Male','Male', 'Female', 'Male')
+
+party_odds <- data.frame(Ideology = ideology_labels, Gender = party_table_party_labels, Party = party_table_gender_labels, OR.hat = round(c(sc.beta.rep.male, sc.beta.rep.fem,sc.beta.dem.male, sl.beta.rep.male, sl.beta.rep.fem, sl.beta.dem.male, vc.beta.rep.male, vc.beta.rep.fem, vc.beta.dem.male, vl.beta.rep.male, vl.beta.rep.fem, vl.beta.dem.male), 4))
+
+party_odds
+
+```
+
