@@ -19,6 +19,8 @@ library(car)
 theme_set(theme_bw()) # set the theme (theme_set is built inside ggplot2)
 ## To do hypothesis testing in ordinal regression model
 if(!"ordinal"%in%rownames(installed.packages())) {install.packages("ordinal")}
+if(!"stargazer"%in%rownames(installed.packages())) {install.packages("stargazer")}
+library(stargazer)
 library(ordinal)
 ## provides  many functions useful for data analysis, high-level graphics, utility operations like describe()
 library(Hmisc)
@@ -292,7 +294,11 @@ vl.beta.dem.male <- exp(beta.hat.vl[3])
 
 
 ```
-Table Odds Ratios for Gender
+
+\
+Table Odds Ratios for Gender\
+
+Generally, there are higher odds men will be rated as either slightly or very conservative rather than neutral compared to women. Men are more likely to fall in the conservative categories instead of the neutral category if they are republicans, rather than democrats. Men were much more likely than women to be in the liberal categories instead of the neutral category conditional if they were classified as democrat. Generally, republican women than democratic women to be in the the conservative categories rather than neutral. Democrats are 
 ```{r}
 ideology_labels <- c('SC', 'SC', 'SC', 'SL', 'SL', 'SL', 'VC', 'VC', 'VC', 'VL', 'VL', 'VL')
 gender_labels <- c('Male','Male', 'Female', 'Male','Male', 'Female', 'Male','Male', 'Female', 'Male','Male', 'Female')
@@ -302,7 +308,9 @@ odds_ratio_gender <- c(sc.beta.male.rep, sc.beta.male.dem ,sc.beta.fem.rep, sl.b
 gender_odds <- data.frame(Ideology = ideology_labels, Gender = gender_labels, Party = party_labels, OR.hat = round(c(sc.beta.male.rep, sc.beta.male.dem ,sc.beta.fem.rep, sl.beta.male.rep, sl.beta.male.dem, sl.beta.fem.rep, vc.beta.male.rep, vc.beta.male.dem, vc.beta.fem.rep, vl.beta.male.rep, vl.beta.male.dem, vl.beta.fem.rep), 4))
 gender_odds
 ```
-Table of Odds Ratio for Party 
+Table of Odds Ratio for Party \
+
+Adults were more likely to be in conservative categories compared to the neutral category if they were republican. If someone is republican and male, the likelihood of being slightly conservative rather than neutral is 2.13. A woman who is republican is even more likely to be slightly conservative than neutral conditional on republican party membership or her odds ratio is 2.33. Conditional on male gender, democrats are less likely to be in any category compared to Neutral. 
 ```{r}
 
 odds_ratio_party <- c(sc.beta.rep.male, sc.beta.rep.fem,sc.beta.dem.male, sl.beta.rep.male, sl.beta.rep.fem, sl.beta.dem.male, vc.beta.rep.male, vc.beta.rep.fem, vc.beta.dem.male, vl.beta.rep.male, vl.beta.rep.fem, vl.beta.dem.male)
