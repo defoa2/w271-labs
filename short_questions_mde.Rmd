@@ -1,0 +1,285 @@
+---
+title: "Lab 1, Short Question"
+geometry: margin=1in
+output:
+  pdf_document:
+    toc: yes
+    number_sections: yes
+fontsize: 11pt
+---
+
+```{r load packages for homework 2, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(stargazer)
+if(!"psych"%in%rownames(installed.packages())) {install.packages("psych")}
+library("psych")
+if(!"car"%in%rownames(installed.packages())) {install.packages("car")}
+library(car)
+theme_set(theme_bw()) # set the theme (theme_set is built inside ggplot2)
+## To do hypothesis testing in ordinal regression model
+if(!"ordinal"%in%rownames(installed.packages())) {install.packages("ordinal")}
+library(ordinal)
+## provides  many functions useful for data analysis, high-level graphics, utility operations like describe()
+library(Hmisc)
+## to work with "grid" graphics
+library(gridExtra)
+## provides function to for Visualization techniques, summary and inference procedures such as assocstats() 
+library(vcd)
+## for multinomial log-linear models.
+library(nnet)
+## To use plor()
+library(MASS)
+## To generate regression results tables and plots
+if(!"finalfit"%in%rownames(installed.packages())) {install.packages("finalfit")}
+library(finalfit)
+
+```
+
+# Political ideology (30 points)
+
+These questions are based on Question 14 of Chapter 3 of the textbook "Analysis of Categorical Data with R" by Bilder and Loughin.
+
+> An example from Section 4.2.5 examines data from the 1991 U.S. General Social Survey that cross-classifies people according to
+
+> - Political ideology: Very liberal (VL), Slightly liberal (SL),Moderate (M), Slightly conservative (SC), and Very conservative (VC)
+> - Political party: Democrat (D) or Republican (R)
+> - Gender: Female (F) or Male (M).
+
+> Consider political ideology to be a response variable, and political party and gender to be explanatory variables. The data are available in the file pol_ideol_data.csv.
+
+## Recode Data (2 points)
+
+Use the factor() function with the ideology variable to ensure that R places the levels of the ideology variable in the correct order.
+
+```{r recode data}
+pol_ideol_data <- read.csv("~/mids_271/spring_24_central/Labs/Lab_1/data/pol_ideol_data.csv", header=T,na.strings=c("","NA")) 
+head(pol_ideol_data)
+describe(pol_ideol_data)
+
+#Converting the ideology variable to factor 
+pol_ideol_data$ideol<- factor(pol_ideol_data$ideol)
+pol_ideol_data$gender <- factor(pol_ideol_data$gender) 
+pol_ideol_data$party <- factor(pol_ideol_data$party)
+
+typeof(pol_ideol_data$ideol) #This comes out as an integer. Should it come out as a factor?
+summary(pol_ideol_data$ideol)
+```
+
+## Test for Independence (5 points)
+
+Analyze the relationships between political ideology and political party and gender using basic visualizations. Afterward, generate a contingency table and assess the independence of political ideology from political party and gender.\
+
+*Comment*: The null hypothesis is $H_{0}: \pi_{i,j} = \pi_{i+}\pi_{+j}$ for each $i,j$ vs. $H_{a}: \pi_{i,j}\neq \pi_{i+}\pi_{+j}$. According the chi-square test statistic, the null hypothesis is rejected (p<0.05) for all three relationships. There is independence among the variables.
+
+```{r Create a bar plot using the count variable}
+
+#Plots of party and idology with gender identified in each bar plot
+p1<- pol_ideol_data %>%
+  ggplot(aes(x=ideol, fill = gender)) + geom_bar() +  labs(title = "Bar Plot of Ideology Categories")
+p1
+p2 <- pol_ideol_data %>% 
+  ggplot(aes(x=party, fill = gender)) + geom_bar() +  labs(title = "Bar Plot of Party Categories")
+p2
+
+```
+
+```{r Create a contingency table and test for the independence}
+print("Contingency table for gender and ideology")
+t1 <- xtabs(formula = count ~ gender + ideol, data = pol_ideol_data)     
+t1
+print("Contingency table for party and ideology")
+t2 <- xtabs(formula = count ~ party + ideol, data = pol_ideol_data) #+ labs(title = "Contingency Table for Gender and Ideology")#, title = "Party Affiliation and Idology Contingency Table")     
+t2
+
+print("Contingency table for party and gender")
+
+t3 <- xtabs(formula = count ~ party + gender, data = pol_ideol_data) 
+t3
+
+#Chi-Square test of independence 
+ind.test.1 <- chisq.test(x = t1, correct = FALSE)
+ind.test.2 <- chisq.test(x = t2, correct = FALSE)
+ind.test.3 <- chisq.test(x = t3, correct = FALSE)
+ind.test.1
+ind.test.2
+ind.test.3
+
+#An alternative way to calculate log-likelihood and chi-square
+library(package = vcd)
+lrt1 <- assocstats(x = t1)
+lrt2 <- assocstats(x = t2)
+lrt3 <- assocstats(x = t3)
+lrt1
+lrt2 
+lrt3
+```
+
+## Regression analysis  (5 points)
+
+Estimate a multinomial regression model and ordinal (proportional odds) regression model that both include party, gender, and their interaction. Perform Likelihood Ratio Tests (LRTs) to test the importance of each explanatory variable.
+
+Also, test whether the proportional odds assumption in the ordinal model is satisfied. Based on this test and other results, which model do you think is more valid?\
+
+*Comment*: The multinomial regression model is weighted by the count of people in each category. The categorization (in no particular order) of political ideology is regressed against party affiliation, gender, and the interaction of gender and party. 
+  
+```{r multinomial and ordinal regressions}
+#Multinomial regression
+library(package = nnet)
+mlmodel <- multinom(formula = ideol ~ gender + party + party:gender, weights = count, data = pol_ideol_data)
+summary(mlmodel)
+
+
+######################################################
+
+#Ordinal Regression
+levels(pol_ideol_data$ideol) #Checking order of dependent variable levels
+
+pol_ideol_data$ideol.order <- factor(pol_ideol_data$ideol, levels = c("VL", "SL", "M", "SC", "VC"))
+levels(pol_ideol_data$ideol.order)
+
+library(package = MASS)
+ord.model <- polr( formula = ideol.order ~ gender + party + party:gender, data = pol_ideol_data, weights = count, method = "logistic")
+summary(ord.model)
+
+
+
+```
+
+```{r LRTs}
+print("The likelihood ratio tests for the multinomial parameters")
+Anova(mlmodel)
+print("The likelihood ratio tests for the ordinal parameters")
+Anova(ord.model)
+#nominal_test(ord.model)
+```
+
+```{r proportional odds assumption}
+
+#Is the proportional odds assumption satisfied?
+
+#Can use nominal test
+
+mod.ord2 <- clm(ideol.order ~ gender + party + party:gender, data = pol_ideol_data)
+
+nominal_test(mod.ord2)
+
+```
+
+## Estimated probabilities  (5 points)
+
+Compute the estimated probabilities for each ideology level given all possible combinations of the party and gender levels.
+
+```{r estimated probabilities for each ideology level}
+#Odds of each ideology given the possible combinations of party and gender levels....
+v.table <- xtabs(formula = count ~ ideol.order + gender + party, data = pol_ideol_data)
+v.table
+ideol.prob <- v.table/rowSums(v.table)
+
+ideol.prob
+```
+
+## Contingency table of estimated counts (5 points)
+
+Construct a contingency table with estimated counts from the model. These estimated counts are found by taking the estimated probability for each ideology level multiplied by their corresponding number of observations for a party and gender combination.
+
+For example, there are 264 observations for gender = "F" and party = "D". Because the multinomial regression model results in $\hat{\pi}_{VL} = 0.1667$, this model’s estimated count is $0.1667 \times 264 = 44$.
+
+- Are the estimated counts the same as the observed? Conduct a goodness of fit test for this and explain the results.
+
+```{r a contingency table with estimated counts}
+
+#Convert contingency table to data frame 
+v.flat <- ftable(v.table, row.vars = c("gender", "party"), col.vars = c("ideol.order"))
+DF <- as.data.frame(v.flat )
+pi.hat <- predict(object = mlmodel, newdata = DF, type = "probs")
+
+pi.hat
+
+estprob <- data.frame(gender = DF[1:4,], party = DF[1:4, 2], round(pi.hat, 4))
+estprob
+
+#estimate counts
+est.count <- round(estprob[,6:10]*v.flat[,0:5], 1)
+est.count
+
+```
+
+```{r goodness of fit test for observed vs. expected}
+chisq.test(x = est.count, correct = FALSE)
+```
+
+## Odds ratios and confidence intervals  (8 points)
+
+To better understand relationships between the explanatory variables and the response, compute odds ratios and their confidence intervals from the estimated models and interpret them.
+
+```{r Odds ratios and confidence intervals}
+#Odds Ratios 
+levels(pol_ideol_data$ideol)
+sum_mlmodel <- summary(mlmodel)
+beta_hats <- sum_mlmodel$coefficients #Coefficients without the intercept?
+print("model summary")
+sum_mlmodel
+print("beta_hats")
+beta_hats
+# Neutral is comparison category 
+  #Odds of for male (and republican)
+#beta.hat_jr for r = 1,...6 and j = 2,3,4,5
+beta.hat.sc <- beta_hats[1,2:4]
+beta.hat.sl <- beta_hats[2,2:4]
+beta.hat.vc <- beta_hats[3,2:4]
+beta.hat.vl <- beta_hats[4,2:4]
+
+#beta_hats for individuals (GENDER), compared to democratic female
+  #Slightly Conservative
+sc.beta.male.rep <- exp(beta.hat.sc[1] + beta.hat.sc[3])
+sc.beta.male.dem <- exp(beta.hat.sc[1])
+sc.beta.fem.rep <- exp(beta.hat.sc[3])
+#sc.beta.fem.dem <- 
+
+    #Slightly Liberal
+sl.beta.male.rep <- exp(beta.hat.sl[1] + beta.hat.sl[3])
+sl.beta.male.dem <- exp(beta.hat.sl[1])
+sl.beta.fem.rep <- exp(beta.hat.sl[3])
+#sl.beta.fem.dem <-
+
+    #Very Conservative
+vc.beta.male.rep <- exp(beta.hat.vc[1] + beta.hat.vc[3])
+vc.beta.male.dem <- exp(beta.hat.vc[1])
+vc.beta.fem.rep <- exp(beta.hat.vc[3])
+#vc.beta.fem.dem <-
+  
+  #Very Liberal
+vl.beta.male.rep <- exp(beta.hat.vl[1] + beta.hat.vl[3])
+vl.beta.male.dem <- exp(beta.hat.vl[1])
+vl.beta.fem.rep <- exp(beta.hat.vl[3])
+#vl.beta.fem.dem <-
+
+#beta_hats for individuals (PARTY)
+  #Slightly Conservative
+sc.beta.rep.male <- exp(beta.hat.sc[2] + beta.hat.sc[3])
+sc.beta.rep.fem <- exp(beta.hat.sc[2])
+sc.beta.dem.male <- exp(beta.hat.sc[3])
+#sc.beta.dem.fem <- 
+  
+  #Slightly Liberal
+sl.beta.rep.male <- exp(beta.hat.sl[2] + beta.hat.sl[3])
+sl.beta.rep.fem <- exp(beta.hat.sl[2])
+sl.beta.dem.male <- exp(beta.hat.sl[3])
+#sl.beta.dem.fem <-   
+
+  #Very Conservative
+vc.beta.rep.male <- exp(beta.hat.vc[2] + beta.hat.vc[3])
+vc.beta.rep.fem <- exp(beta.hat.vc[2])
+vc.beta.dem.male <- exp(beta.hat.vc[3])
+#vc.beta.dem.fem <-    
+
+  #Very Liberal
+vl.beta.rep.male <- exp(beta.hat.vl[2] + beta.hat.vl[3])
+vl.beta.rep.fem <- exp(beta.hat.vl[2])
+vl.beta.dem.male <- exp(beta.hat.vl[3])
+#vl.beta.dem.fem <- 
+  
+  
+
+```
