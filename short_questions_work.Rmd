@@ -44,7 +44,13 @@ pol_ideol <- read.csv("pol_ideol_data.csv",
 pol_ideol$ideol_levels <- factor(pol_ideol$ideol, levels = c("VL", "SL", "M", "SC", "VC"))
 pol_ideol$gender <- as.factor(pol_ideol$gender)
 pol_ideol$party <- as.factor(pol_ideol$party)
-head(pol_ideol)
+
+# create new column to identify combos of party and gender
+pol_ideol$segment <- ifelse(pol_ideol$gender == 'F' & pol_ideol$party == 'D', "F/D", NA)
+pol_ideol$segment <- ifelse(pol_ideol$gender == 'F' & pol_ideol$party == 'R', "F/R", pol_ideol$segment)
+pol_ideol$segment <- ifelse(pol_ideol$gender == 'M' & pol_ideol$party == 'D', "M/D", pol_ideol$segment)
+pol_ideol$segment <- ifelse(pol_ideol$gender == 'M' & pol_ideol$party == 'R', "M/R", pol_ideol$segment)
+# head(pol_ideol)
 ```
 
 
@@ -52,7 +58,7 @@ head(pol_ideol)
 
 Analyze the relationships between political ideology and political party and gender using basic visualizations. Afterward, generate a contingency table and assess the independence of political ideology from political party and gender.
 
-```{r Create a bar plot using the count variable}
+```{r Create a bar plot using the count variable, include = FALSE}
 p <- ggplot(data=pol_ideol, aes(x=ideol_levels, y=count))+
   geom_bar(stat='identity') +
   ggtitle("Political Ideology Distribution") + 
@@ -60,7 +66,7 @@ p <- ggplot(data=pol_ideol, aes(x=ideol_levels, y=count))+
 p
 ```
 
-```{r}
+```{r include = FALSE}
 p <- ggplot(data=pol_ideol, aes(x=party, y=count))+
   geom_bar(stat='identity') +
   ggtitle("Party Distribution") + 
@@ -68,7 +74,7 @@ p <- ggplot(data=pol_ideol, aes(x=party, y=count))+
 p
 ```
 
-```{r}
+```{r include = FALSE}
 p <- ggplot(data=pol_ideol, aes(x=gender, y=count))+
   geom_bar(stat='identity') +
   ggtitle("Gender Distribution") + 
@@ -76,7 +82,7 @@ p <- ggplot(data=pol_ideol, aes(x=gender, y=count))+
 p
 ```
 
-```{r}
+```{r gender-party divide for each ideology }
 ggplot(pol_ideol, aes(fill=party, y=count, x=ideol_levels)) + 
     geom_bar(position="dodge", stat="identity") +
     ggtitle("Party and Ideologies") +
@@ -88,22 +94,39 @@ ggplot(pol_ideol, aes(fill=gender, y=count, x=ideol_levels)) +
     xlab("Ideologies")
 ```
 
+```{r}
+#Plots of party and idology with gender identified in each bar plot
+# variable names updated to match annie's code
+p1<- pol_ideol %>%
+  ggplot(aes(x=ideol_levels, fill = gender)) + geom_bar() +  labs(title = "Bar Plot of Ideology Categories")
+p1
+p2 <- pol_ideol %>% 
+  ggplot(aes(x=party_levels, fill = gender)) + geom_bar() +  labs(title = "Bar Plot of Party Categories")
+p2
+```
+
+```{r}
+# barplot of relative ideology counts for each gender/party category
+p1<- pol_ideol %>%
+  ggplot(aes(x=segment, y= count, fill = ideol_levels)) + geom_bar(stat = "identity") +  labs(title = "Bar Plot of Ideology Categories by gender and party")
+p1
+```
 
 ```{r Create a contingency table and test for the independence}
 # independence of political ideology and gender
 tab1 <- xtabs(count ~ ideol_levels + gender, data=pol_ideol)
+tab1 # contingency table ideol and gender
 
-## chi-square test
-test1<- chisq.test(tab1, correct=FALSE)
-test1$stdres
+test1<- chisq.test(tab1, correct=FALSE) ## chi-square test
+# test1$stdres
 test1
 
 # independence of political ideology and party
-tab1 <- xtabs(count ~ ideol_levels + party, data=pol_ideol)
+tab2 <- xtabs(count ~ ideol_levels + party, data=pol_ideol)
+tab2 # contingency table idol an party
 
-## chi-square test
-test1<- chisq.test(tab1, correct=FALSE)
-test1$stdres
+test1<- chisq.test(tab2, correct=FALSE) # chi-square test
+# test1$stdres
 test1
 
 ```
@@ -117,15 +140,19 @@ Estimate a multinomial regression model and ordinal (proportional odds) regressi
 Also, test whether the proportional odds assumption in the ordinal model is satisfied. Based on this test and other results, which model do you think is more valid?
   
 ```{r multinomial and ordinal regressions}
+# multinomial model
 mod.nomial <- multinom(ideol_levels ~ party + gender + party:gender, data=pol_ideol, weights = count)
 summary(mod.nomial)
+# ordinal model
 mod.ord <- clm(ideol_levels ~ party + gender, data=pol_ideol, weights = count)
 summary(mod.ord)
 ```
 
 
 ```{r LRTs}
+# anova test on multinomial model
 Anova(mod.nomial, test = "LR")
+# anova test on ordinal model
 Anova(mod.ord, test = "Chisq")
 ```
 
@@ -134,6 +161,7 @@ Using Anova to test each of the explanatory variables, the p-value is small for 
 For the ordinal model, the p-value for party, gender and its interaction was small, so these variables do have an affect on ideology under this model.
 
 ```{r proportional odds assumption}
+# nominal test for proportional odds assumption 
 nominal_test(mod.ord)
 ```
 
@@ -144,18 +172,23 @@ The p-values for all of the variables are large, we cannot reject the null hypot
 Compute the estimated probabilities for each ideology level given all possible combinations of the party and gender levels.
 
 ```{r estimated probabilities for each ideology level}
+# predict probability of all ideologies for female & democrat
 data.f.d <- data.frame(party = 'D', gender = 'F')
 pred.f.d <- predict(mod.nomial, newdata = data.f.d, type="probs", se=TRUE)
 
+# predict probability of all ideologies for female & republican
 data.f.r <- data.frame(party = 'R', gender = 'F')
 pred.f.r <- predict(mod.nomial, newdata = data.f.r, type="probs", se=TRUE)
 
+# predict probability of all ideologies for male & democrat
 data.m.d <- data.frame(party = 'D', gender = 'M')
 pred.m.d <- predict(mod.nomial, newdata = data.m.d, type="probs", se=TRUE)
 
+# predict probability of all ideologies for male & republican
 data.m.r <- data.frame(party = 'R', gender = 'M')
 pred.m.r <- predict(mod.nomial, newdata = data.m.r, type="probs", se=TRUE)
 
+# predicted probabilities together into table
 tab_dat <- rbind(pred.f.d, pred.f.r, pred.m.d, pred.m.r)
 colnames(tab_dat) <- c("VL", "SL", "M", "SC", "VC")
 rownames(tab_dat) <- c("Female, Democrat", "Female, Republican", "Male, Democrat", "Male, Republican")
@@ -172,6 +205,7 @@ For example, there are 264 observations for gender = "F" and party = "D". Becaus
 - Are the estimated counts the same as the observed? Conduct a goodness of fit test for this and explain the results.
 
 ```{r a contingency table with estimated counts}
+# get observed total counts for 4 cross-categories
 fd.sum <- sum(pol_ideol[which(pol_ideol$gender == "F" & pol_ideol$party == 'D'), ]$count)
 fr.sum <- sum(pol_ideol[which(pol_ideol$gender == "F" & pol_ideol$party == 'R'), ]$count)
 md.sum <- sum(pol_ideol[which(pol_ideol$gender == "M" & pol_ideol$party == 'D'), ]$count)
@@ -182,50 +216,46 @@ vl.prob <- unname(tab[, 1])
 vl.dat <- matrix(round(c(vl.prob[1]*fd.sum, vl.prob[2]*fr.sum, vl.prob[3]*md.sum, vl.prob[4]*mr.sum)), nrow = 2, ncol = 2)
 colnames(vl.dat) <- c("F", "M")
 rownames(vl.dat) <- c("D", "R")
-vl.dat
-
-# VL contingency
-vl.prob <- unname(tab[, 1])
-vl.dat <- matrix(round(c(vl.prob[1]*fd.sum, vl.prob[2]*fr.sum, vl.prob[3]*md.sum, vl.prob[4]*mr.sum)), nrow = 2, ncol = 2)
-colnames(vl.dat) <- c("F", "M")
-rownames(vl.dat) <- c("D", "R")
-print("VL contingency table")
-vl.dat
 
 # SL contingency
 sl.prob <- unname(tab[, 2])
 sl.dat <- matrix(round(c(sl.prob[1]*fd.sum, sl.prob[2]*fr.sum, sl.prob[3]*md.sum, sl.prob[4]*mr.sum)), nrow = 2, ncol = 2)
 colnames(sl.dat) <- c("F", "M")
 rownames(sl.dat) <- c("D", "R")
-print("SL contingency table")
-sl.dat
 
 # M contingency
 m.prob <- unname(tab[, 3])
 m.dat <- matrix(round(c(m.prob[1]*fd.sum, m.prob[2]*fr.sum, m.prob[3]*md.sum, m.prob[4]*mr.sum)), nrow = 2, ncol = 2)
 colnames(m.dat) <- c("F", "M")
 rownames(m.dat) <- c("D", "R")
-print("M contingency table")
-m.dat
 
 # SC contingency
 sc.prob <- unname(tab[, 4])
 sc.dat <- matrix(round(c(sc.prob[1]*fd.sum, sc.prob[2]*fr.sum, sc.prob[3]*md.sum, sc.prob[4]*mr.sum)), nrow = 2, ncol = 2)
 colnames(sc.dat) <- c("F", "M")
 rownames(sc.dat) <- c("D", "R")
-print("SC contingency table")
-sc.dat
 
 # VC contingency
 vc.prob <- unname(tab[, 5])
 vc.dat <- matrix(round(c(vc.prob[1]*fd.sum, vc.prob[2]*fr.sum, vc.prob[3]*md.sum, vc.prob[4]*mr.sum)), nrow = 2, ncol = 2)
 colnames(vc.dat) <- c("F", "M")
 rownames(vc.dat) <- c("D", "R")
+
+# print all contingency tables
+print("VL contingency table")
+vl.dat
+print("SL contingency table")
+sl.dat
+print("M contingency table")
+m.dat
+print("SC contingency table")
+sc.dat
 print("VC contingency table")
 vc.dat
+
 ```
 
-```{r echo=FALSE}
+```{r include=FALSE}
 # checking calculations on contingency table
 # fd.sum
 # fr.sum
@@ -237,23 +267,28 @@ vc.dat
 ```
 
 ```{r goodness of fit test for observed vs. expected}
+# GoF test VL observed with expected
 vl.actual <- matrix(pol_ideol[which(pol_ideol$ideol_levels == 'VL'), ]$count, nrow=2, ncol=2)
 chisq.test(vl.dat, vl.actual)
 
+# GoF test SL observed with expected
 sl.actual <- matrix(pol_ideol[which(pol_ideol$ideol_levels == 'SL'), ]$count, nrow=2, ncol=2)
 chisq.test(sl.dat, sl.actual)
 
+# GoF test M observed with expected
 m.actual <- matrix(pol_ideol[which(pol_ideol$ideol_levels == 'M'), ]$count, nrow=2, ncol=2)
 chisq.test(m.dat, m.actual)
 
+# GoF test SC observed with expected
 sc.actual <- matrix(pol_ideol[which(pol_ideol$ideol_levels == 'SC'), ]$count, nrow=2, ncol=2)
 chisq.test(sc.dat, sc.actual)
 
+# GoF test VC observed with expected
 vc.actual <- matrix(pol_ideol[which(pol_ideol$ideol_levels == 'VC'), ]$count, nrow=2, ncol=2)
 chisq.test(vc.dat, vc.actual)
 ```
 
-The p-values are large which means that there is not enough evidence to reject the null hypothesis and conclude that the distribution of the expected and actual counts are different from each other.
+The p-values are large which means that there is not enough evidence to reject the null hypothesis and conclude that the distribution of the expected and actual counts are different from each other. The estimated counts are the same as the observed counts
 
 ## Odds ratios and confidence intervals  (8 points)
 
