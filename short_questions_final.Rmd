@@ -82,7 +82,7 @@ Analyze the relationships between political ideology and political party and gen
 The histogram of ideology is presented first by party and then by gender. Both histograms show the largest concentration of voters in the "neutral" political ideology. Democrats are especially likely to be "neutral" as are women. Republicans are more prominent in the "slightly conservative" and "very conservative" categories. Men also are more likely to be in these categories. \
 The following bar plot suggests the data were collected from an equal number of republicans and democrats, and men and women. Finally, the bar plot "Bar Plot of Ideology Categorically by Gender and Party" also suggests female democrats are more likely to fall in a liberal ideology category while male republicans will be more likely to fall in a conservative ideological category.
 
-```{r Create a bar plot using the count variable, include = FALSE}
+```{r Create a bar plot using the count variable}
 p <- ggplot(data=pol_ideol, aes(x=ideol_levels, y=count))+
   geom_bar(stat='identity') +
   ggtitle("Political Ideology Distribution") + 
