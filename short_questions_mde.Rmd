@@ -123,7 +123,7 @@ Estimate a multinomial regression model and ordinal (proportional odds) regressi
 
 Also, test whether the proportional odds assumption in the ordinal model is satisfied. Based on this test and other results, which model do you think is more valid?\
 
-*Comment*: The multinomial regression model is weighted by the count of people in each category. The categorization (in no particular order) of political ideology is regressed against party affiliation, gender, and the interaction of gender and party. 
+*Comment*: The multinomial regression model is weighted by the count of people in each category. The categorization (in no particular order) of political ideology is regressed against party affiliation, gender, and the interaction of gender and party. The decrease in the log likelihood value is small for each additional variable. The p-value of their significance in explaining the likelihood improvement is does not support the null. The multinomial model is our model of choice for this exercise.
   
 ```{r multinomial and ordinal regressions}
 #Multinomial regression
@@ -226,6 +226,9 @@ The Odds Ratio for republican versus democrat for each jth level is equal to $\f
 
 ```{r Odds ratios and confidence intervals, echo = FALSE}
 #Odds Ratios 
+#Estimating multinomial logit model for odds ratio 
+
+
 levels(pol_ideol_data$ideol)
 sum_mlmodel <- summary(mlmodel)
 beta_hats <- sum_mlmodel$coefficients #Coefficients without the intercept?
@@ -324,7 +327,10 @@ party_odds <- data.frame(Ideology = ideology_labels, Gender = party_table_party_
 party_odds
 
 ```
-##Confidence Intervals for Odds Ratios 
+##Confidence Intervals for Odds Ratios \
+
+The Wald Confidence Interval estimations for each parameter support most betas are not equal to zero. However, the odds a female republican is less likely than a female democrat to be very liberal are not significantly different from zero. The Wald Confidence interval [-0.1071, 1.1224] includes zero. \
+When looking at the confidence intervals for party, there are more cases where the odds ratio is not significantly different from zero. The odds a republican male is more or less likely to be slightly liberal than a female democrat are not different from zero (Wald Confidence interval [-0.1535, 1.0586]). The odds a republican male is less likely to be very liberal than a female democrat are also not significantly different from zero as the Wald Confidence Interval ranges from -.3763 to 0.9462. Finally, democratic males odds ratio for very liberal is also not significantly different from zero (Wald Confidence interval [-0.1071, 1.224])
 
 ```{r}
 conf.beta <- confint(object = mlmodel, level = 0.95)
@@ -338,35 +344,36 @@ partylevels1 <- c(1,0,1,1,0,1,1,0,1,1,0,1)
 interactlevels1 <- c(1,0,0,1,0,0,1,0,0,1,0,0)
 
 sc.beta.male.rep.ci <- sc.beta.male.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[1,1]+varcov[3,3]-2*varcov[1,3]))
-sc.beta.male.rep.ci
+#sc.beta.male.rep.ci
 sc.beta.male.dem.ci <- sc.beta.male.dem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[1,1]))
-sc.beta.male.dem.ci 
+#sc.beta.male.dem.ci 
 sc.beta.fem.rep.ci <- sc.beta.fem.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[3,3]))
-sc.beta.fem.rep.ci
+#sc.beta.fem.rep.ci
 
 sl.beta.male.rep.ci <- sl.beta.male.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[5,5]+varcov[7,7]-2*varcov[5,7]))
-sl.beta.male.rep.ci 
+#sl.beta.male.rep.ci 
 sl.beta.male.dem.ci <- sl.beta.male.dem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[5,5]))
-sl.beta.male.dem.ci
+#sl.beta.male.dem.ci
 sl.beta.fem.rep.ci <- sl.beta.fem.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[7,7]))
-sl.beta.fem.rep.ci
+#sl.beta.fem.rep.ci
 
 vc.beta.male.rep.ci <- vc.beta.male.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[9,9]+varcov[11,11]-2*varcov[9,11]))
-vc.beta.male.rep.ci 
+#vc.beta.male.rep.ci 
 vc.beta.male.dem.ci <- vc.beta.male.dem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[9,9]))
-vc.beta.male.dem.ci
+#vc.beta.male.dem.ci
 vc.beta.fem.rep.ci <- vc.beta.fem.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[11,11]))
-vc.beta.fem.rep.ci
+#vc.beta.fem.rep.ci
 
 
 vl.beta.male.rep.ci <- vl.beta.male.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[13,13]+varcov[15,15]-2*varcov[13,15]))
-vl.beta.male.rep.ci
+#vl.beta.male.rep.ci
 vl.beta.male.dem.ci <- vl.beta.male.dem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[13,13]))
-vl.beta.male.dem.ci
+#vl.beta.male.dem.ci
 vl.beta.fem.rep.ci <- vl.beta.fem.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[15,15]))
-vl.beta.fem.rep.ci
+#vl.beta.fem.rep.ci
 
-gender_odds_cis <- data.frame(Ideology = ideology_labels, Gender = gender_labels, Party = party_labels, Wald.CI = c(sc.beta.male.rep.ci, sc.beta.male.dem.ci ,sc.beta.fem.rep.ci, sl.beta.male.rep.ci, sl.beta.male.dem.ci, sl.beta.fem.rep.ci, vc.beta.male.rep.ci, vc.beta.male.dem.ci, vc.beta.fem.rep.ci, vl.beta.male.rep.ci, vl.beta.male.dem.ci, vl.beta.fem.rep.ci))
+print("Gender Odds and Confidence Intervals")
+gender_odds_cis <- data.frame(Ideology = ideology_labels, Gender = gender_labels, Party = party_labels, OR.hat = round(c(sc.beta.rep.male, sc.beta.rep.fem,sc.beta.dem.male, sl.beta.rep.male, sl.beta.rep.fem, sl.beta.dem.male, vc.beta.rep.male, vc.beta.rep.fem, vc.beta.dem.male, vl.beta.rep.male, vl.beta.rep.fem, vl.beta.dem.male),4), Wald.CI.lower = round(c(sc.beta.male.rep.ci[1], sc.beta.male.dem.ci [1], sc.beta.fem.rep.ci[1], sl.beta.male.rep.ci[1], sl.beta.male.dem.ci[1], sl.beta.fem.rep.ci[1], vc.beta.male.rep.ci[1], vc.beta.male.dem.ci[1], vc.beta.fem.rep.ci[1], vl.beta.male.rep.ci[1], vl.beta.male.dem.ci[1], vl.beta.fem.rep.ci[1]),4), Wald.CI.upper = round(c(sc.beta.male.rep.ci[2],sc.beta.male.dem.ci [2] ,sc.beta.fem.rep.ci[2], sl.beta.male.rep.ci[2], sl.beta.male.dem.ci[2], sl.beta.fem.rep.ci[2], vc.beta.male.rep.ci[2], vc.beta.male.dem.ci[2], vc.beta.fem.rep.ci[2], vl.beta.male.rep.ci[2], vl.beta.male.dem.ci[2], vl.beta.fem.rep.ci[2]),4))
 
 gender_odds_cis
 
@@ -388,6 +395,13 @@ vl.beta.rep.male.ci <- vl.beta.rep.male + qnorm(p= c(0.025, 0.975))*sqrt((varcov
 vl.beta.rep.fem.ci <- vl.beta.rep.fem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[14,14]))
 vl.beta.dem.male.ci <- vl.beta.dem.male + qnorm(p= c(0.025, 0.975))*sqrt((varcov[15,15]))
 
+print("Party Odds and Confidence Intervals")
+
+party_cis <- round(c(sc.beta.rep.male.ci, sc.beta.rep.fem.ci, sc.beta.dem.male.ci, sl.beta.rep.male.ci, sl.beta.rep.fem.ci, sl.beta.dem.male.ci, vc.beta.rep.male.ci, vc.beta.rep.fem.ci, vc.beta.dem.male.ci, vl.beta.rep.male.ci, vl.beta.rep.fem.ci, vl.beta.dem.male.ci), 4)
+
+party_odds_cis <- data.frame(Ideology = ideology_labels, Gender = party_table_party_labels, Party = party_table_gender_labels, OR.hat = round(c(sc.beta.rep.male, sc.beta.rep.fem,sc.beta.dem.male, sl.beta.rep.male, sl.beta.rep.fem, sl.beta.dem.male, vc.beta.rep.male, vc.beta.rep.fem, vc.beta.dem.male, vl.beta.rep.male, vl.beta.rep.fem, vl.beta.dem.male), 4), Wald.CI.lower = round(c(sc.beta.rep.male.ci[1], sc.beta.rep.fem.ci[1], sc.beta.dem.male.ci[1], sl.beta.rep.male.ci[1], sl.beta.rep.fem.ci[1], sl.beta.dem.male.ci[1], vc.beta.rep.male.ci[1], vc.beta.rep.fem.ci[1], vc.beta.dem.male.ci[1], vl.beta.rep.male.ci[1], vl.beta.rep.fem.ci[1], vl.beta.dem.male.ci[1]), 4), Wald.CI.upper = round(c(sc.beta.rep.male.ci[2], sc.beta.rep.fem.ci[2], sc.beta.dem.male.ci[2], sl.beta.rep.male.ci[2], sl.beta.rep.fem.ci[2], sl.beta.dem.male.ci[2], vc.beta.rep.male.ci[2], vc.beta.rep.fem.ci[2], vc.beta.dem.male.ci[2], vl.beta.rep.male.ci[2], vl.beta.rep.fem.ci[2], vl.beta.dem.male.ci[2]), 4)
+                             )
+party_odds_cis
 
 ```
 
