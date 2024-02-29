@@ -61,6 +61,77 @@ Conduct a comprehensive Exploratory Data Analysis on the `co2` series. This shou
 
 What you report in the deliverable should not be your own process of discovery, but rather a guided discussion that you have constructed so that your audience can come to an understanding as succinctly and successfully as possible. This means that figures should be thoughtfully constructed and what you learn from them should be discussed in text; to the extent that there is _any_ raw output from your analysis, you should intend for people to read and interpret it, and you should write your own interpretation as well. 
 
+
+
+
+
+```{r}
+df_co2 <- 
+   as_tsibble(co2)
+df_co2
+```
+
+```{r}
+df_co2 %>%
+  ggplot() +aes(x=index, y=value) + geom_line() + ggtitle("CO2 Levels 1960-1998") + xlab("Year/Month") + ylab("Co2 levels")
+```
+
+
+```{r}
+lags <- df_co2 %>%
+  gg_lag(value, geom = "point", lag=6:8) +
+  labs(title = "Lagged scatterplots",
+       y = "Co2 Levels",x = "lag(value, k)")
+
+acf_vals <- df_co2 %>%
+  ACF(value, lag_max = 48) %>%
+  autoplot() + labs(title="Monthly Co2 levels")
+
+grid.arrange(lags,acf_vals, nrow = 1, ncol = 2)
+```
+```{r}
+lags
+```
+
+```{r}
+df_co2 %>%
+  ggplot() +aes(x=index, y=log(value)) + geom_line() + ggtitle("log CO2 Levels 1960-1998") + xlab("Year/Month") + ylab("log Co2 levels")
+```
+
+```{r}
+seasonalplot <-df_co2 %>%
+  gg_season(value, labels = "both") +
+  labs(y = "CO2 Levels", x = "Month",
+       title = "Seasonal plot: Co2 Levels 1960-1998")
+seasonalplot
+```
+
+```{r}
+PBS |>
+  filter(ATC2 == "H02") |>
+  summarise(Cost = sum(Cost)/1e6) |>
+  transmute(
+    `Sales ($million)` = Cost,
+    `Log sales` = log(Cost),
+    `Annual change in log sales` = difference(log(Cost), 12),
+    `Doubly differenced log sales` =
+                     difference(difference(log(Cost), 12), 1)
+  ) |>
+  pivot_longer(-Month, names_to="Type", values_to="Sales") |>
+  mutate(
+    Type = factor(Type, levels = c(
+      "Sales ($million)",
+      "Log sales",
+      "Annual change in log sales",
+      "Doubly differenced log sales"))
+  ) |>
+  ggplot(aes(x = Month, y = Sales)) +
+  geom_line() +
+  facet_grid(vars(Type), scales = "free_y") +
+  labs(title = "Corticosteroid drug sales", y = NULL)
+```
+
+
 ## (3 points) Task 2a: Linear time trend model
 
 Fit a linear time trend model to the `co2` series, and examine the characteristics of the residuals. Compare this to a quadratic time trend model. Discuss whether a logarithmic transformation of the data would be appropriate. Fit a polynomial time trend model that incorporates seasonal dummy variables, and use this model to generate forecasts to the year 2020. 
