@@ -1,0 +1,978 @@
+---
+title: "W271 Group Lab"
+subtitle: "Bike share demand"
+author: "Annie DeForge, Hannah Abraham, Mariah Ehmke, Nora Povejsil"
+output: bookdown::pdf_document2
+fontsize: 11pt
+geometry: margin=1in
+---
+
+
+# Short Questions
+```{r load packages for homework 2, message=FALSE, warning=FALSE, echo=FALSE}
+install.packages("corrplot")
+library(corrplot)
+library(tidyverse)
+library(stargazer)
+library(finalfit)
+library(nnet)
+library(car)
+library(ordinal)
+theme_set(theme_bw()) # set the theme (theme_set is built inside ggplot2)
+```
+
+# Political ideology (30 points)
+
+These questions are based on Question 14 of Chapter 3 of the textbook "Analysis of Categorical Data with R" by Bilder and Loughin.
+
+> An example from Section 4.2.5 examines data from the 1991 U.S. General Social Survey that cross-classifies people according to
+
+> - Political ideology: Very liberal (VL), Slightly liberal (SL),Moderate (M), Slightly conservative (SC), and Very conservative (VC)
+> - Political party: Democrat (D) or Republican (R)
+> - Gender: Female (F) or Male (M).
+
+> Consider political ideology to be a response variable, and political party and gender to be explanatory variables. The data are available in the file pol_ideol_data.csv.
+
+## Recode Data (2 points)
+
+Use the factor() function with the ideology variable to ensure that R places the levels of the ideology variable in the correct order.
+
+```{r read in data, echo=FALSE}
+pol_ideol <- read.csv("~/mids_271/spring_24_central/Labs/w271-labs/pol_ideol_data.csv",
+                         header=T,na.strings=c("","NA")) 
+```
+
+
+```{r recode data, echo=FALSE}
+pol_ideol$ideol_levels <- factor(pol_ideol$ideol, levels = c("VL", "SL", "M", "SC", "VC"))
+pol_ideol$gender <- as.factor(pol_ideol$gender)
+pol_ideol$party <- as.factor(pol_ideol$party)
+
+# create new column to identify combos of party and gender
+pol_ideol$segment <- ifelse(pol_ideol$gender == 'F' & pol_ideol$party == 'D', "F/D", NA)
+pol_ideol$segment <- ifelse(pol_ideol$gender == 'F' & pol_ideol$party == 'R', "F/R", pol_ideol$segment)
+pol_ideol$segment <- ifelse(pol_ideol$gender == 'M' & pol_ideol$party == 'D', "M/D", pol_ideol$segment)
+pol_ideol$segment <- ifelse(pol_ideol$gender == 'M' & pol_ideol$party == 'R', "M/R", pol_ideol$segment)
+# head(pol_ideol)
+```
+
+
+## Test for Independence (5 points)
+
+Analyze the relationships between political ideology and political party and gender using basic visualizations. Afterward, generate a contingency table and assess the independence of political ideology from political party and gender.
+*Comment*\
+The histogram of ideology is presented first by party and then by gender. Both histograms show the largest concentration of voters in the "neutral" political ideology. Democrats are especially likely to be "neutral" as are women. Republicans are more prominent in the "slightly conservative" and "very conservative" categories. Men also are more likely to be in these categories. \
+The following bar plot suggests the data were collected from an equal number of republicans and democrats, and men and women. Finally, the bar plot "Bar Plot of Ideology Categorically by Gender and Party" also suggests female democrats are more likely to fall in a liberal ideology category while male republicans will be more likely to fall in a conservative ideological category.
+
+```{r Create a bar plot using the count variable, include = FALSE }
+p <- ggplot(data=pol_ideol, aes(x=ideol_levels, y=count))+
+  geom_bar(stat='identity') +
+  ggtitle("Political Ideology Distribution") + 
+  xlab("Ideology") + ylab("Frequency")
+p
+```
+
+```{r include=FALSE}
+p <- ggplot(data=pol_ideol, aes(x=party, y=count))+
+  geom_bar(stat='identity') +
+  ggtitle("Party Distribution") + 
+  xlab("Ideology") + ylab("Frequency")
+p
+```
+
+```{r include=FALSE}
+p <- ggplot(data=pol_ideol, aes(x=gender, y=count))+
+  geom_bar(stat='identity') +
+  ggtitle("Gender Distribution") + 
+  xlab("Ideology") + ylab("Frequency")
+p
+```
+
+```{r gender-party divide for each ideology}
+ggplot(pol_ideol, aes(fill=party, y=count, x=ideol_levels)) + 
+    geom_bar(position="dodge", stat="identity") +
+    ggtitle("Party and Ideologies") +
+    xlab("Ideologies")
+
+ggplot(pol_ideol, aes(fill=gender, y=count, x=ideol_levels)) + 
+    geom_bar(position="dodge", stat="identity") +
+    ggtitle("Gender and Ideologies") +
+    xlab("Ideologies")
+```
+
+```{r include=FALSE}
+#Plots of party and idology with gender identified in each bar plot
+
+p1<- pol_ideol %>%
+  ggplot(aes(x=ideol_levels, fill = gender)) + geom_bar() +  labs(title = "Bar Plot of Ideology Categories")
+p1
+p2 <- pol_ideol %>% 
+  ggplot(aes(x=party, fill = gender)) + geom_bar() +  labs(title = "Bar Plot of Party Categories")
+p2
+```
+
+
+```{r, echo=FALSE}
+# barplot of relative ideology counts for each gender/party category
+p1<- pol_ideol %>%
+  ggplot(aes(x=segment, y= count, fill = ideol_levels)) + geom_bar(stat = "identity") +  labs(title = "Bar Plot of Ideology Categories by gender and party")
+p1
+```
+
+From the visualizations we can see that of the conservative categories, there are more men. For the liberal categories there are more women. The greatest proportion of the observations are moderate, and women are more likely to be moderate.
+
+*Comment* \
+The results of the Chi-Square test for independence tests the null hypothesis $H_{0}:\pi_{ij}=\pi_{i}\pi_{j}$. The alternative hypothesis is $H_{a}:\pi_{ij}\neq\pi_{i}\pi_{j}$. We reject the null hypothesis for the test of independence between gender and ideology ($\chi^2=10.73, p<0.05$). Gender and ideology are not independent according to this test. The chi-square value is 60.905 and p<0.001 for the test of independence between ideology and party. We reject the null. The party and ideology levels are not independent. 
+```{r Create a contingency table and test for the independence, echo=FALSE}
+# independence of political ideology and gender
+tab1 <- xtabs(count ~ ideol_levels + gender, data=pol_ideol)
+tab1 # contingency table ideol and gender
+
+test1<- chisq.test(tab1, correct=FALSE) ## chi-square test
+# test1$stdres
+test1
+
+# independence of political ideology and party
+tab2 <- xtabs(count ~ ideol_levels + party, data=pol_ideol)
+tab2 # contingency table idol an party
+
+test1<- chisq.test(tab2, correct=FALSE) # chi-square test
+# test1$stdres
+test1
+
+```
+
+The p-values for gender and party are both small, so the null hypothesis is that party and gender are independent from ideology is rejected, and we can conclude that ideology is dependent on these two variables.
+
+
+## Regression analysis  (5 points)
+
+Estimate a multinomial regression model and ordinal (proportional odds) regression model that both include party, gender, and their interaction. Perform Likelihood Ratio Tests (LRTs) to test the importance of each explanatory variable.
+
+Also, test whether the proportional odds assumption in the ordinal model is satisfied. Based on this test and other results, which model do you think is more valid?
+
+*Comment*\
+We estimate the multinomial logit and ordinal regression models. The AIC for the multinomial logit model is 2491.087. It is 2484.15 for the ordinal model. 
+
+Using Anova to test each of the explanatory variables using a $\chi^2$ test. In the multinomial logit model, only one variable, party, is significant--only as an isolated variable and not in the interaction term. In the multinomial logit model, party is positively related to a voter being in any one of the non-neutral categories. Gender does not achieve significance with a p-value of 0.06. 
+
+In the ordinal model, both party and gender, and their interaction term is statistically significant (p<0.001). For the ordinal model, the p-value for party, gender and its interaction was small, so these variables do have an affect on ideology under this model.
+
+We then use the proportional odds test to determine whether the odds model is appropriate for this task. While the ordinal model performed slightly better than the multinomial by AIC and number of significant coefficients, the hypothesis that the probability of the outcome increases with each level is rejected. The p-value of their significance in explaining the likelihood improvement is does not support the null. The multinomial model is our model of choice for this exercise.
+```{r multinomial and ordinal regressions, echo=FALSE}
+# multinomial model
+mod.nomial <- multinom(ideol_levels ~ party + gender + party:gender, data=pol_ideol, weights = count)
+summary(mod.nomial)
+# ordinal model
+mod.ord <- clm(ideol_levels ~ party + gender + party:gender, data=pol_ideol, weights = count)
+summary(mod.ord)
+```
+
+
+Having printed the multinomial and ordinal model, we can run an ANOVA test on both.
+
+```{r LRTs, echo=FALSE}
+# anova test on multinomial model
+Anova(mod.nomial, test = "LR")
+# anova test on ordinal model
+Anova(mod.ord, test = "Chisq")
+```
+
+Using Anova to test each of the explanatory variables in the multinomial model, the p-value is small for party, so we can conclude that is has an effect on ideology. The p-values were large for gender and the party-gender interaction effect, so for these variables we are unable to reject the null hypothesis.
+
+For the ordinal model, the p-value for party, gender and its interaction was small, so these variables do have an affect on ideology under this model.
+
+
+```{r proportional odds assumption, echo=FALSE}
+# nominal test for proportional odds assumption 
+nominal_test(mod.ord)
+```
+
+The p-values for all of the variables are large, we cannot reject the null hypothesis for proportional odds, so the ordinal model is not valid and we should use the multinomial model.  
+
+
+## Estimated probabilities  (5 points)
+
+Compute the estimated probabilities for each ideology level given all possible combinations of the party and gender levels.
+
+```{r estimated probabilities for each ideology level, echo=FALSE}
+# predict probability of all ideologies for female & democrat
+data.f.d <- data.frame(party = 'D', gender = 'F')
+pred.f.d <- predict(mod.nomial, newdata = data.f.d, type="probs", se=TRUE)
+
+# predict probability of all ideologies for female & republican
+data.f.r <- data.frame(party = 'R', gender = 'F')
+pred.f.r <- predict(mod.nomial, newdata = data.f.r, type="probs", se=TRUE)
+
+# predict probability of all ideologies for male & democrat
+data.m.d <- data.frame(party = 'D', gender = 'M')
+pred.m.d <- predict(mod.nomial, newdata = data.m.d, type="probs", se=TRUE)
+
+# predict probability of all ideologies for male & republican
+data.m.r <- data.frame(party = 'R', gender = 'M')
+pred.m.r <- predict(mod.nomial, newdata = data.m.r, type="probs", se=TRUE)
+
+# predicted probabilities together into table
+tab_dat <- rbind(pred.f.d, pred.f.r, pred.m.d, pred.m.r)
+colnames(tab_dat) <- c("VL", "SL", "M", "SC", "VC")
+rownames(tab_dat) <- c("Female, Democrat", "Female, Republican", "Male, Democrat", "Male, Republican")
+tab <- as.table(tab_dat)
+tab
+```
+
+## Contingency table of estimated counts (5 points)
+
+Construct a contingency table with estimated counts from the model. These estimated counts are found by taking the estimated probability for each ideology level multiplied by their corresponding number of observations for a party and gender combination.
+
+For example, there are 264 observations for gender = "F" and party = "D". Because the multinomial regression model results in $\hat{\pi}_{VL} = 0.1667$, this model’s estimated count is $0.1667 \times 264 = 44$.
+
+- Are the estimated counts the same as the observed? Conduct a goodness of fit test for this and explain the results.
+
+```{r a contingency table with estimated counts, echo=FALSE}
+# get observed total counts for 4 cross-categories
+fd.sum <- sum(pol_ideol[which(pol_ideol$gender == "F" & pol_ideol$party == 'D'), ]$count)
+fr.sum <- sum(pol_ideol[which(pol_ideol$gender == "F" & pol_ideol$party == 'R'), ]$count)
+md.sum <- sum(pol_ideol[which(pol_ideol$gender == "M" & pol_ideol$party == 'D'), ]$count)
+mr.sum <- sum(pol_ideol[which(pol_ideol$gender == "M" & pol_ideol$party == 'R'), ]$count)
+
+# VL contingency
+vl.prob <- unname(tab[, 1])
+vl.dat <- matrix(round(c(vl.prob[1]*fd.sum, vl.prob[2]*fr.sum, vl.prob[3]*md.sum, vl.prob[4]*mr.sum)), nrow = 2, ncol = 2)
+colnames(vl.dat) <- c("F", "M")
+rownames(vl.dat) <- c("D", "R")
+
+# SL contingency
+sl.prob <- unname(tab[, 2])
+sl.dat <- matrix(round(c(sl.prob[1]*fd.sum, sl.prob[2]*fr.sum, sl.prob[3]*md.sum, sl.prob[4]*mr.sum)), nrow = 2, ncol = 2)
+colnames(sl.dat) <- c("F", "M")
+rownames(sl.dat) <- c("D", "R")
+
+# M contingency
+m.prob <- unname(tab[, 3])
+m.dat <- matrix(round(c(m.prob[1]*fd.sum, m.prob[2]*fr.sum, m.prob[3]*md.sum, m.prob[4]*mr.sum)), nrow = 2, ncol = 2)
+colnames(m.dat) <- c("F", "M")
+rownames(m.dat) <- c("D", "R")
+
+# SC contingency
+sc.prob <- unname(tab[, 4])
+sc.dat <- matrix(round(c(sc.prob[1]*fd.sum, sc.prob[2]*fr.sum, sc.prob[3]*md.sum, sc.prob[4]*mr.sum)), nrow = 2, ncol = 2)
+colnames(sc.dat) <- c("F", "M")
+rownames(sc.dat) <- c("D", "R")
+
+# VC contingency
+vc.prob <- unname(tab[, 5])
+vc.dat <- matrix(round(c(vc.prob[1]*fd.sum, vc.prob[2]*fr.sum, vc.prob[3]*md.sum, vc.prob[4]*mr.sum)), nrow = 2, ncol = 2)
+colnames(vc.dat) <- c("F", "M")
+rownames(vc.dat) <- c("D", "R")
+
+# print all contingency tables
+print("VL contingency table")
+vl.dat
+print("SL contingency table")
+sl.dat
+print("M contingency table")
+m.dat
+print("SC contingency table")
+sc.dat
+print("VC contingency table")
+vc.dat
+
+```
+
+```{r include=FALSE}
+# checking calculations on contingency table
+# fd.sum
+# fr.sum
+# md.sum
+# mr.sum
+# 
+# pred.f.d*fd.sum
+# pred.m.d*md.sum
+```
+
+
+
+
+```{r goodness of fit test for observed vs. expected, echo=FALSE}
+# GoF test VL observed with expected
+vl.actual <- matrix(pol_ideol[which(pol_ideol$ideol_levels == 'VL'), ]$count, nrow=2, ncol=2)
+chisq.test(vl.dat, vl.actual)
+
+# GoF test SL observed with expected
+sl.actual <- matrix(pol_ideol[which(pol_ideol$ideol_levels == 'SL'), ]$count, nrow=2, ncol=2)
+chisq.test(sl.dat, sl.actual)
+
+# GoF test M observed with expected
+m.actual <- matrix(pol_ideol[which(pol_ideol$ideol_levels == 'M'), ]$count, nrow=2, ncol=2)
+chisq.test(m.dat, m.actual)
+
+# GoF test SC observed with expected
+sc.actual <- matrix(pol_ideol[which(pol_ideol$ideol_levels == 'SC'), ]$count, nrow=2, ncol=2)
+chisq.test(sc.dat, sc.actual)
+
+# GoF test VC observed with expected
+vc.actual <- matrix(pol_ideol[which(pol_ideol$ideol_levels == 'VC'), ]$count, nrow=2, ncol=2)
+chisq.test(vc.dat, vc.actual)
+```
+*Comment*
+The p-values are large which means that there is not enough evidence to reject the null hypothesis and conclude that the distribution of the expected and actual counts are different from each other. The estimated counts are the same as the observed counts.
+
+
+## Odds ratios and confidence intervals  (8 points)
+
+To better understand relationships between the explanatory variables and the response, compute odds ratios and their confidence intervals from the estimated models and interpret them.\
+
+The odds ratios for a given variable, depend on the category of comparison (e.g., VL, SL, N, SC, or VL). In the multinomial logit model, the left-out gender category was female and the left-out party category was democrat. The comparison level for ideology was 'Neutral.' We compare the odds of the different coefficients for the coefficients from each VL, SL, SC, and VL level. \
+Assuming the model specification 
+$\log(\pi_{j}/\pi_{1}) = \beta_{j0} + \beta_{jGender}x_{Gender} + \beta_{jParty} + \beta_{jGender*Party}$ where j = SC, SL, VC, VL. \
+
+The Odds Ratio for male versus female for the each jth level is equal to  $\frac{exp(\beta_{j0}+\beta_{j1}*(gender+c)+\beta_{j3}*party*(gender+c))}{exp(\beta_{j0}+\beta_{j1}*gender+\beta_{j3}*party*gender)} = exp(\beta_{j1}*c+\beta_{j3}*party*c)$ where c = 1 for a categorical variable. Further, gender will be equal to one as it is also a categorical variable. \
+
+The Odds Ratio for republican versus democrat for each jth level is equal to $\frac{exp(\beta_{j0}+\beta_{j2}*(party+c)+\beta_{j3}*gender*(party+c))}{exp(\beta_{j0}+\beta_{j2}*party+\beta_{j3}*gender*party)} = exp(\beta_{j2}*c+\beta_{j3}*gender*c)$ where c = 1. 
+    
+
+`
+
+
+```{r Odds ratios and confidence intervals, echo = FALSE}
+#Odds Ratios 
+levels(pol_ideol$ideol)
+sum_mlmodel <- summary(mod.nomial)
+beta_hats <- sum_mlmodel$coefficients #Coefficients without the intercept?
+print("model summary")
+sum_mlmodel
+print("beta_hats")
+beta_hats
+# Neutral is comparison category 
+  
+#beta.hat_jr for r = 1,...6 and j = 2,3,4,5
+beta.hat.sl <- beta_hats[1,2:4]
+beta.hat.m <- beta_hats[2,2:4]
+beta.hat.sc <- beta_hats[3,2:4]
+beta.hat.vc <- beta_hats[4,2:4]
+
+#beta_hats for individuals (GENDER), compared to democratic female
+  #Slightly Conservative
+sc.beta.male.rep <- exp(beta.hat.sc[1] + beta.hat.sc[2] + beta.hat.sc[3])
+sc.beta.male.dem <- exp(beta.hat.sc[2])
+sc.beta.fem.rep <- exp(beta.hat.sc[1])
+#sc.beta.fem.dem <- 
+
+    #Slightly Liberal
+sl.beta.male.rep <- exp(beta.hat.sl[1] + beta.hat.sl[2]+ beta.hat.sc[3])
+sl.beta.male.dem <- exp(beta.hat.sl[2])
+sl.beta.fem.rep <- exp(beta.hat.sl[1])
+#sl.beta.fem.dem <-
+
+    #Very Conservative
+vc.beta.male.rep <- exp(beta.hat.vc[1] + beta.hat.vc[2]+ beta.hat.sc[3])
+vc.beta.male.dem <- exp(beta.hat.vc[2])
+vc.beta.fem.rep <- exp(beta.hat.vc[1])
+#vc.beta.fem.dem <-
+  
+  #moderate
+m.beta.male.rep <- exp(beta.hat.m[1] + beta.hat.m[2]+ beta.hat.m[3])
+m.beta.male.dem <- exp(beta.hat.m[2])
+m.beta.fem.rep <- exp(beta.hat.m[1])
+#vl.beta.fem.dem <-
+
+# #beta_hats for individuals (PARTY)
+#   #Slightly Conservative
+# sc.beta.rep.male <- exp(beta.hat.sc[2] + beta.hat.sc[3])
+# sc.beta.rep.fem <- exp(beta.hat.sc[2])
+# sc.beta.dem.male <- exp(beta.hat.sc[3])
+# #sc.beta.dem.fem <- 
+#   
+#   #Slightly Liberal
+# sl.beta.rep.male <- exp(beta.hat.sl[2] + beta.hat.sl[3])
+# sl.beta.rep.fem <- exp(beta.hat.sl[2])
+# sl.beta.dem.male <- exp(beta.hat.sl[3])
+# #sl.beta.dem.fem <-   
+# 
+#   #Very Conservative
+# vc.beta.rep.male <- exp(beta.hat.vc[2] + beta.hat.vc[3])
+# vc.beta.rep.fem <- exp(beta.hat.vc[2])
+# vc.beta.dem.male <- exp(beta.hat.vc[3])
+# #vc.beta.dem.fem <-    
+# 
+#   #Very Liberal
+# vl.beta.rep.male <- exp(beta.hat.vl[2] + beta.hat.vl[3])
+# vl.beta.rep.fem <- exp(beta.hat.vl[2])
+# vl.beta.dem.male <- exp(beta.hat.vl[3])
+# #vl.beta.dem.fem <- 
+  
+
+
+```
+
+\
+Table Odds Ratios for Gender\
+
+Generally, there are higher odds men will be rated as either slightly or very conservative rather than moderate compared to women. Men are more likely to fall in the conservative categories instead of the moderate category if they are republicans, rather than democrats. Men were much more likely than women to be in the liberal categories instead of the neutral category conditional if they were classified as democrat. Generally, republican women than democratic women to be in the the conservative categories rather than moderate. 
+```{r}
+ideology_labels <- c('SL', 'SL', 'SL', 'M', 'M', 'M', 'SC', 'SC', 'SC', 'VC', 'VC', 'VC')
+gender_labels <- c('Male','Male', 'Female', 'Male','Male', 'Female', 'Male','Male', 'Female', 'Male','Male', 'Female')
+party_labels <- c('Rep', 'Dem', 'Rep', 'Rep', 'Dem', 'Rep', 'Rep', 'Dem', 'Rep', 'Rep', 'Dem', 'Rep' )
+odds_ratio_gender <- c(sl.beta.male.rep, sl.beta.male.dem, sl.beta.fem.rep, m.beta.male.rep, m.beta.male.dem, m.beta.fem.rep, sc.beta.male.rep, sc.beta.male.dem,sc.beta.fem.rep, vc.beta.male.rep, vc.beta.male.dem, vc.beta.fem.rep)
+
+gender_odds <- data.frame(Ideology = ideology_labels, Gender = gender_labels, Party = party_labels, OR.hat = round(odds_ratio_gender, 4))
+gender_odds
+```
+
+
+Looking at this table, we can see that the largest odds ratios occurred for men or women Republicans who identified as slightly conservative they were 7.17 and 4.14 times, respectively, more likely to identify as slightly conservative than very liberal compared to the base comparison of a female Democrat. The smallest odds ratios were for male democrats who were less likely to identify with an ideology compared to very liberal.
+
+```{r include=FALSE}
+
+# odds_ratio_party <- c(sc.beta.rep.male, sc.beta.rep.fem,sc.beta.dem.male, sl.beta.rep.male, sl.beta.rep.fem, sl.beta.dem.male, vc.beta.rep.male, vc.beta.rep.fem, vc.beta.dem.male, vl.beta.rep.male, vl.beta.rep.fem, vl.beta.dem.male)
+# 
+# party_table_party_labels <- c('Republican', 'Republican', 'Democrat', 'Republican', 'Republican', 'Democrat', 'Republican', 'Republican', 'Democrat', 'Republican', 'Republican', 'Democrat' )
+# 
+# party_table_gender_labels <- c('Male', 'Female', 'Male', 'Male', 'Female', 'Male','Male', 'Female', 'Male','Male', 'Female', 'Male')
+# 
+# party_odds <- data.frame(Ideology = ideology_labels, Gender = party_table_party_labels, Party = party_table_gender_labels, OR.hat = round(c(sc.beta.rep.male, sc.beta.rep.fem,sc.beta.dem.male, sl.beta.rep.male, sl.beta.rep.fem, sl.beta.dem.male, vc.beta.rep.male, vc.beta.rep.fem, vc.beta.dem.male, vl.beta.rep.male, vl.beta.rep.fem, vl.beta.dem.male), 4))
+# 
+# party_odds
+
+```
+##Confidence Intervals for Odds Ratios 
+
+```{r}
+conf.beta <- confint(object = mod.nomial, level = 0.95)
+conf.beta #Results are in 3-D array 
+
+#Outcomes for Gender SC 
+varcov <- vcov(mod.nomial)
+# varcov
+genderlevels1 <- c(1,1,0,1,1,0,1,1,0,1,1,0)
+partylevels1 <- c(1,0,1,1,0,1,1,0,1,1,0,1)
+interactlevels1 <- c(1,0,0,1,0,0,1,0,0,1,0,0)
+
+sl.beta.male.rep.ci <- sl.beta.male.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[2,2]+varcov[3,3]-2*varcov[2,3]))
+sl.beta.male.dem.ci <- sl.beta.male.dem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[3,3]))
+sl.beta.fem.rep.ci <- sl.beta.fem.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[2,2]))
+```
+
+```{r}
+#Outcomes for Gender M 
+m.beta.male.rep.ci <- m.beta.male.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[6,6]+varcov[7,7]-2*varcov[6,7]))
+m.beta.male.dem.ci <- m.beta.male.dem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[7,7]))
+m.beta.fem.rep.ci <- m.beta.fem.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[6,6]))
+```
+
+```{r}
+#Outcomes for Gender SC 
+sc.beta.male.rep.ci <- sc.beta.male.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[10,10]+varcov[11,11]-2*varcov[10,11]))
+sc.beta.male.dem.ci <- sc.beta.male.dem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[11,11]))
+sc.beta.fem.rep.ci <- sc.beta.fem.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[10,10]))
+```
+
+```{r}
+#Outcomes for Gender VC 
+vc.beta.male.rep.ci <- vc.beta.male.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[14,14]+varcov[15,15]-2*varcov[14,15]))
+vc.beta.male.dem.ci <- vc.beta.male.dem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[15,15]))
+vc.beta.fem.rep.ci <- vc.beta.fem.rep + qnorm(p= c(0.025, 0.975))*sqrt((varcov[14,14]))
+```
+
+```{r}
+gender_odds_cis <- data.frame(Ideology = ideology_labels, Gender = gender_labels, Party = party_labels, Wald.lower = c(sl.beta.male.rep.ci[1], sl.beta.male.dem.ci[1], sl.beta.fem.rep.ci[1], m.beta.male.rep.ci[1], m.beta.male.dem.ci[1], m.beta.fem.rep.ci[1], sc.beta.male.rep.ci[1], sc.beta.male.dem.ci[1],sc.beta.fem.rep.ci[1], vc.beta.male.rep.ci[1], vc.beta.male.dem.ci[1], vc.beta.fem.rep.ci[1]), Wald.upper = c(sl.beta.male.rep.ci[2], sl.beta.male.dem.ci[2], sl.beta.fem.rep.ci[2], m.beta.male.rep.ci[2], m.beta.male.dem.ci[2], m.beta.fem.rep.ci[2], sc.beta.male.rep.ci[2], sc.beta.male.dem.ci[2],sc.beta.fem.rep.ci[2], vc.beta.male.rep.ci[2], vc.beta.male.dem.ci[2], vc.beta.fem.rep.ci[2]))
+
+gender_odds_cis
+```
+
+For all of the OR confidence intervals, the interval is not inclusive of 0 except for female republicans who were slightly conservative, meaning that for all of the other categories, we can conclude that the difference in likelihood is significantly different than 0.
+
+```{r include = FALSE}
+# sc.beta.rep.male.ci <- sc.beta.rep.male + qnorm(p= c(0.025, 0.975))*sqrt((varcov[2,2]+varcov[3,3]-2*varcov[2,3]))
+# sc.beta.rep.fem.ci <- sc.beta.rep.fem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[3,3]))
+# sc.beta.dem.male.ci <- sc.beta.dem.male + qnorm(p= c(0.025, 0.975))*sqrt((varcov[2,2]))
+# 
+# sl.beta.rep.male.ci <- sl.beta.rep.male + qnorm(p= c(0.025, 0.975))*sqrt((varcov[6,6]+varcov[7,7]-2*varcov[6,7]))
+# sl.beta.rep.fem.ci <- sl.beta.rep.fem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[6,6]))
+# sl.beta.dem.male.ci <- sl.beta.dem.male + qnorm(p= c(0.025, 0.975))*sqrt((varcov[7,7]))
+# 
+# vc.beta.rep.male.ci <- vc.beta.rep.male + qnorm(p= c(0.025, 0.975))*sqrt((varcov[10,10]+varcov[11,11]-2*varcov[10,11]))
+# vc.beta.rep.fem.ci <- vc.beta.rep.fem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[10,10]))
+# vc.beta.dem.male.ci <- vc.beta.rep.fem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[11,11]))
+# 
+# vl.beta.rep.male.ci <- vl.beta.rep.male + qnorm(p= c(0.025, 0.975))*sqrt((varcov[14,14]+varcov[15,15]-2*varcov[14,15]))
+# vl.beta.rep.fem.ci <- vl.beta.rep.fem + qnorm(p= c(0.025, 0.975))*sqrt((varcov[14,14]))
+# vl.beta.dem.male.ci <- vl.beta.dem.male + qnorm(p= c(0.025, 0.975))*sqrt((varcov[15,15]))
+# 
+
+```
+
+# Report
+# Introduction (5 points)
+
+Bike usage and rentals are prevalent in many large cities. The increasing popularity of cycling for leisure and commutes has given rise to many popular bike-share programs. It is important for these programs to meet demand for bikes to maintain this form of accessible transportation. Using a bike sharing dataset from Seoul, Korea for analysis, we hypothesize that demand for bikes will significantly change depending on the season, temperature, time of day, weekdays vs. weekends, and on holidays.
+
+We will test this with the null hypothesis that none of these factors will have an effect on bike usage/demand:
+
+  $$H_0: \beta_{season} = \beta_{time.of.day} =  \beta_{holiday} =  \beta_{temp} = \beta_{weekday} = 0$$
+
+And our alternative hypothesis will be that at least one of these factors has a significant effect on bike demand:
+    $$H_A: \beta_{season} \text{ or } \beta_{time.of.day} \text{ or } \beta_{holiday} \text{ or } \beta_{temp} \text{ or } \beta_{weekday} \ne 0$$
+
+The results of these tests will help stakeholders decide when to increase the supply of bikes in the city and when to hire more staff depending on the season, day, hour, and relevant weather conditions.
+
+
+```{r load in libraries, echo=FALSE, message=FALSE}
+# libraries necessary
+library(tidyverse) # ggplots
+library(MASS) # negative binomial
+library(car) # Anova function
+library(lubridate) # convert date data
+library(gamlr) # AICc
+library(AER) # overdispersion test
+library(stats) # stepwise function
+library(corrplot) # correlation plot
+library(stargazer) # stargazer table
+```
+
+
+# Data (20 points)
+```{r load in the data, echo=FALSE}
+# create a list of column names
+c.names <- c("Date", "Rented.Bike.Count", "Hour", "Temp", "Humidity", "Wind.speed", "Visibility", "Dew.point.temp", "Solar.radiation", "Rainfall", "Snowfall", "Seasons", "Holiday", "Functioning")
+
+# read in the data
+seoul.bike <- read.csv("~/mids_271/spring_24_central/Labs/Lab_1/data/SeoulBikeData.csv", na = c("N/A",""))
+
+# head(seoul.bike)
+idx <- which(seoul.bike$Functioning == "Yes")
+seoul.bike1 <- seoul.bike[idx, ]
+# head(seoul.bike1)
+```
+
+
+## Description (5 points)
+
+The data records the number of public bicycles rented per hour in the Seoul Bike Sharing System from December 1, 2017, to November 30, 2018. Each record has time of day, date, season, indication if it is a holiday, weather information (Temperature (Celsius), Humidity, Windspeed, Visibility, Dewpoint, Solar radiation, Snowfall, Rainfall), and the number of bikes rented. We decided to omit the feature FunctioningDay that indicates if the program is running, since we aren’t interested in predicting rentals when the operation is closed. The dataset has a total of 8465 hours of observations after eliminating the FunctioningDay feature.
+
+
+## EDA (15 points)
+
+```{r creating new variable , echo=FALSE}
+# creating new variable time of day from bike
+seoul.bike1$time.of.day <- ifelse(seoul.bike1$Hour <= 6, "night", seoul.bike1$Hour)
+seoul.bike1$time.of.day <- ifelse(seoul.bike1$Hour > 6, "morning", seoul.bike1$time.of.day)
+seoul.bike1$time.of.day <- ifelse(seoul.bike1$Hour > 12, "afternoon", seoul.bike1$time.of.day)
+seoul.bike1$time.of.day <- ifelse(seoul.bike1$Hour > 17, "evening", seoul.bike1$time.of.day)
+seoul.bike1$time.of.day <- as.factor(seoul.bike1$time.of.day)
+
+# converting date to day of the week variable
+seoul.bike1$Weekday <- weekdays(as.POSIXct(seoul.bike1$Date, tz = "Asia/Seoul"))
+
+seoul.bike1$Weekday <- ifelse(seoul.bike1$Weekday %in% c("Saturday", "Sunday"), 1, 0)
+# head(seoul.bike1)
+seoul.bike1$Weekday <- as.factor(seoul.bike1$Weekday)
+# summary(seoul.bike1$Weekday)
+
+# clear day variable
+seoul.bike1$Clear.day <- as.factor(ifelse(seoul.bike1$Rainfall == 0 & seoul.bike1$Snowfall ==0, 1, 0))
+# summary(seoul.bike1$Clear.day)
+```
+
+
+```{r, echo =FALSE}
+seoul.bike1$Date <-as.Date(seoul.bike1$Date)
+# summary(seoul.bike1$Date)
+seoul.bike1$Rented.Bike.Count <- as.numeric(seoul.bike1$Rented.Bike.Count )
+# summary(seoul.bike1$Rented.Bike.Count)
+seoul.bike1$Hour <- as.numeric(seoul.bike1$Hour )
+# summary(seoul.bike1$Hour)
+seoul.bike1$Temp <- as.numeric(seoul.bike1$Temp)
+# summary(seoul.bike1$Temp)
+seoul.bike1$Humidity <- as.numeric(seoul.bike1$Humidity )
+# summary(seoul.bike1$Humidity)
+# summary(seoul.bike1$Solar.radiation)
+seoul.bike1$Wind.speed <- as.numeric(seoul.bike1$Wind.speed)
+# summary(seoul.bike1$Wind.speed)
+seoul.bike1$Visibility <- as.numeric(seoul.bike1$Visibility )
+# summary(seoul.bike1$Visibility)
+seoul.bike1$Dew.point.temp <- as.numeric(seoul.bike1$Dew.point.temp )
+# summary(seoul.bike1$Dew.point.temp)
+seoul.bike1$Solar.radiation <- as.numeric(seoul.bike1$Solar.radiation )
+# summary(seoul.bike1$Solar.radiation)
+seoul.bike1$Rainfall <- as.numeric(seoul.bike1$Rainfall)
+# summary(seoul.bike1$Rainfall)
+seoul.bike1$Snowfall <- as.numeric(seoul.bike1$Snowfall )
+# summary(seoul.bike1$Snowfall)
+seoul.bike1$Seasons <- as.factor(seoul.bike1$Seasons)
+# summary(seoul.bike1$Seasons)
+seoul.bike1$Holiday <- as.factor(seoul.bike1$Holiday)
+# summary(seoul.bike1$Holiday)
+seoul.bike1$Functioning <- as.factor(seoul.bike1$Functioning)
+# summary(seoul.bike1$Functioning)
+
+# 
+# hist(seoul.bike1$Rented.Bike.Count)
+# 
+# summary(seoul.bike1$time.of.day)
+# head(seoul.bike1)
+```
+
+To understand the relationship between the number of bike rentals and time of day, we classified each observation into one of the four categories: morning (between 6am and 12pm), afternoon (between 12pm and 5pm), evening (between 5pm and 12am), and night (between 12am and 6am). We also used the date variable to determine if a day was a week day or  weekend day, and created a binary column called Weekday.
+
+As seen in the histogram below of rainfall, there are many days of 0 rainfall, which would create a problem model convergence problem for us. To solve this problem, we created a binary variable clear day, which measured if there was or was not any rain or snow.
+
+```{r histogram, echo=FALSE, fig.cap= "Histogram of rainfall"}
+# histogram of rainfall
+hist(seoul.bike1$Snowfall, main = "Histogram of Rainfall", xlab = "CM of Rainfall")
+```
+
+We visualize correlations between our numeric variables, as seen in the figure below 
+using a correlation plot (on a scale of -1 to 1). We decided to choose between highly correlated variables, like Temperature and Dew Point, and Humidity and Visibility. 
+
+```{r correlation plot, echo=FALSE, fig.cap= "Bike rental variable correlations", fig.height= 3.5, fig.width=3.5}
+corrplot(cor(seoul.bike1[,c(2, 3, 4, 5, 6, 7, 8, 9, 10, 11)]))
+```
+
+The temporal dynamics including season, time of day, and weekday vs. weekend are presented in figures 3 and 4. Throughout the seasons in Figure 3, the bike rental peaks during the evening in Autumn, Spring, and Summer. The winter had substantially lower rentals, with similar rentals in the mornings and evenings. Summer was the peak season for ridership. In figure 4, the number of bikes rented on weekends (blue bar) appears to be approximately twice that of weekend rentals (maroon bar).  
+
+```{r, echo=FALSE, fig.cap= "Bike rentals across times of day, categorized by different seasons", fig.height= 3.5, fig.width=3.8}
+ggplot(seoul.bike1, aes(x = Weekday, y = Rented.Bike.Count, fill = Weekday)) +
+geom_bar(stat = "identity") +
+scale_fill_manual(values = c("steelblue", "maroon")) +
+labs(title = "Bike Counts by Weekday vs. Weekend",
+x = "Weekday (1= Weekday, 0 = Weekend)", y = "Bike Counts",
+fill = "Weekday") +
+theme_minimal() + 
+theme(axis.text=element_text(size=9),
+      axis.title=element_text(size=10))
+ggplot(seoul.bike1, aes(x = seoul.bike1$Seasons, y = seoul.bike1$Rented.Bike.Count, fill = seoul.bike1$time.of.day)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Bike Counts by Month and Time of Day",
+       x = "Month", y = "Bike Counts",
+       fill = "Time of Day") +
+  theme_minimal() + 
+  theme(axis.text=element_text(size=9),
+        axis.title=element_text(size=10))
+```
+
+
+The number of bikes rented per time period are plotted against the temperature during the rental period in figure 5. Each plot point is color coded according to the season, blue = summer, red = autumn, green = spring, and lavender = winter. It appears bike rentals peak around 25 degrees C or 77 degrees F. This temperature is most common in spring, fall, and summer. Winter is associated with below freezing point temperatures and very low bike rental numbers.  Overall, the relationship between temperature and bike count looks exponential. Later, the winter variable will be transformed as a quadratic term to account for this variable behavior.
+
+```{r echo=FALSE, fig.height= 4, fig.width=5.5}
+p <- ggplot(aes(x= seoul.bike1$Temp,
+                y = seoul.bike1$Rented.Bike.Count,
+                color = Seasons), data = seoul.bike1) + geom_point() + 
+                labs(title = "Bike Counts by Temperature",
+                x = "Temperature", y = "Bike Counts") 
+p
+```
+
+Despite the potential correlation between season and temperature, season is included as a variable as it also reflects other ridership determinants factors (e.g., school being out of session in summer). The visualizations also point to possible interaction between season and temperature. Our model adaptations will include interaction terms to account for the conditional relationships between season and temperature. 
+
+
+```{r include = FALSE}
+
+# creating new variable time of day from bike
+seoul.bike1$TempF <- seoul.bike1$Temp * (9/5) + 32
+
+# -1, 103
+max(seoul.bike1$TempF)
+seoul.bike1$TempCat <- ifelse(seoul.bike1$TempF <= 20, "below 20", seoul.bike1$TempF)
+seoul.bike1$TempCat <- ifelse(seoul.bike1$TempF > 20, "21-40", seoul.bike1$TempCat)
+seoul.bike1$TempCat <- ifelse(seoul.bike1$TempF > 40, "41-60", seoul.bike1$TempCat)
+seoul.bike1$TempCat <- ifelse(seoul.bike1$TempF > 60, "61-80", seoul.bike1$TempCat)
+seoul.bike1$TempCat <- ifelse(seoul.bike1$TempF > 80, "81-100", seoul.bike1$TempCat)
+seoul.bike1$TempCat <- ifelse(seoul.bike1$TempF> 100, "over 100", seoul.bike1$TempCat)
+seoul.bike1$TempCat <- as.factor(seoul.bike1$TempCat)
+summary(seoul.bike1$TempCat)
+dim(seoul.bike1)
+```
+
+
+
+
+```{r include=FALSE}
+p <- ggplot(aes(x=log(Hour), y = Rented.Bike.Count, color = time.of.day), data = seoul.bike1) + geom_point()
+p
+```
+
+```{r include=FALSE}
+p <- ggplot(data=seoul.bike1, aes(x=time.of.day, y=Rented.Bike.Count)) + geom_bar(stat = 'identity')
+p
+```
+
+
+# Model Development (40 points)
+
+## Poisson regression (10 points)
+
+Given the count nature of the dependent variable, a Poisson model was used to understand the relationship between bike rental and the independent variables (time of day, temperature, season, weekend versus weekday, and holidays).  
+
+$$\log(Rented\_Bike\_Count) = \beta_0 + \beta_1 time.of.day + \beta_2 Temperature + \beta_3 Seasons + \beta_4 Holiday + \beta_5 Weekday + u$$
+
+```{r echo=FALSE}
+model_poisson_1 <- glm(formula = Rented.Bike.Count ~ time.of.day +  Temp + Seasons + Holiday + Weekday, family = poisson(link = "log"), data = seoul.bike1)
+# summary(model_poisson_1)
+```
+
+In the baseline poisson model, the model converged after 5 iterations and achieved an AIC of 2665931. All coefficients for the explanatory variables were significant (p<0.001). The categorical variables (e.g., season, holiday, and time of day) coefficients are compared to the left-out categories. Bike rentals increase in the evening and decrease at night compared to daytime rentals. There is a general positive relationship between bike rentals and temperatures. Compared to summer rentals, bike rentals in spring, summer and winter decrease. There are more bike rentals on holidays and less rentals on weekdays. The model’s likelihood ratio test confirmed time of day, season, temperature, holiday, and weekday indicator variables and the temperature variable have significant relationships to the number of bike rentals per hour.
+
+## Model Comparison (10 points)
+
+The second model includes possible omitted variable bias related to additional weather measurements –wind speed, visibility, rain or snow fall. The AIC for this model decreases to 2148485 and all explanatory variables are significantly different from zero. The coefficients show that this model is consistent with all the trends in the first model. In addition, an increase in bike rentals is also explained by higher wind speeds, more visibility, and no rainfall or snow. In addition, an increase in bike rentals is also explained by higher wind speeds, more visibility, and no rainfall or snow. Again, the likelihood ratio test confirms the significant relationship between all of these variables and rental bike count.
+
+
+\begin{align*}
+\log(Rented\_Bike\_Count) = & \beta_0 + \beta_1 time.of.day + \beta_2 Temperature + \beta_3 Seasons + \beta_4 Holiday \\
+& + \beta_5 Weekday + \beta_6 WindSpeed + \beta_7 Visibility + \beta_8 Clear.Day + u
+\end{align*}
+
+```{r echo=FALSE}
+model_poisson_2 <- glm(formula = Rented.Bike.Count ~time.of.day +  Temp + Seasons + Holiday + Weekday + Wind.speed + Visibility + Clear.day, family = poisson(link = "log"), data = seoul.bike1)
+# summary(model_poisson_2)
+```
+
+The EDA suggests non-linear and interaction relationships may be present. Model 3 includes quadratic terms for temperature, wind speed, and visibility, and interactions between temperature and time of day, weekdays and time of day, and temperature and seasons.
+
+
+
+\begin{align*} 
+\log(Rented\_Bike\_Count) = & \beta_0 + \beta_1 time.of.day + \beta_2 Temperature + \beta_3 Seasons + \beta_4 Holiday \\
+& + \beta_5 Weekday + \beta_6 WindSpeed + \beta_7 Visibility + \beta_8 Clear.Day \\
+& + \beta_9 Temperature^2 + \beta_{10} Visibility^2 + \beta_{11} WindSpeed^2 \\
+& + \beta_{12}Temperature \times Seasons  + \beta_{13} Temperature \times time.of.day\\
+& + \beta_{14} Weekday \times time.of.day  + u
+\end{align*}
+
+
+
+
+```{r echo=FALSE}
+model_poisson_3 <- glm(formula = Rented.Bike.Count ~ time.of.day +  Temp + Seasons + Holiday + Weekday + Wind.speed + Visibility + Clear.day +  I(Temp**2)  + I(Visibility**2) + I(Wind.speed**2) + 
+                  Temp:Seasons + Temp:time.of.day + Weekday:time.of.day,
+                family = poisson(link = "log"), data = seoul.bike1)
+# summary(model_poisson_3)
+```
+
+```{r include=FALSE}
+Anova(model_poisson_1, test = "LR")
+Anova(model_poisson_2, test = "LR")
+Anova(model_poisson_3, test = "LR")
+```
+
+The AIC continues to fall in model 3, to 1975743, following the addition of the transformed variables. Unlike models 1 and 2, there is a negative relationship between evening hours and bike rentals, and no significant relationship between summer and bike rentals. We also see a less significant, but positive relationship between weekday and bike rentals in this model. The quadratic transformations and interaction terms were significant (p<0.001). We see a negative relationship between all of the quadratic terms and bike rental count. We see that the interaction between temperatures and spring, and temperature and evening hours relate to more bike rentals. Temperature interactions with summer and winter show a decrease in bike rentals. We also see a negative relationship between bike rentals and all of the weekday interactions, as well as night hours and temperature. The likelihood ratio test confirms the significance of all of the variables we added to this model.
+Using three information criterion scores (AIC, AICc, and BIC), all scores point to model 3 performing the best, then model 2, and lastly model 1.
+
+
+
+```{r, echo=FALSE}
+AIC.tab <- data.frame(method = c("AIC", "AICc", "BIC"),
+                      mod1 = c(AIC(model_poisson_1), AICc(model_poisson_1), BIC(model_poisson_1)),
+                      mod.2 = c(AIC(model_poisson_2), AICc(model_poisson_2), BIC(model_poisson_2)),
+                      mod.3 = c(AIC(model_poisson_3), AICc(model_poisson_3), BIC(model_poisson_3)))
+
+AIC.tab
+```
+
+
+## Model Assessment (10 points)
+
+From the residual vs linear predictor plot we see that for our best model, model 3, there are many outliers in our data, which has a negative effect on its performance. Model 3 dispersion tests reveal significant overdispersion. Despite coefficient significance, the underlying distribution is not well-suited for poisson regression.
+	
+```{r echo=FALSE, fig.cap="Resiudal versus linear predictor for best Poisson model" , fig.height= 3.5, fig.width=3.5}
+# residual plots for poisson model
+pred1 <- predict(model_poisson_3, type = "response")
+res1 <- residuals(model_poisson_3, type = "pearson")
+s.res1 <- rstandard(model_poisson_3, type = "pearson")
+lin.pred1 <- model_poisson_3$linear.predictors
+
+dfassess1 <- data.frame(seoul.bike1, pred1, res1, s.res1, lin.pred1)
+
+dfassess1 %>%
+  ggplot(aes(x = dfassess1$pred1, y = dfassess1$s.res1)) + 
+  geom_point() + 
+  geom_hline(yintercept = c(3, 2, 0, -2, -3), color = "red", linetype = "dashed") + 
+  geom_smooth(se = FALSE) +
+  ggtitle("Standardized residuals vs fitted values") + 
+  labs(x = "Fitted values", y="Standardized Residuals")
+dfassess1 %>%
+  ggplot(aes(x = dfassess1$lin.pred1, y = dfassess1$s.res1)) + 
+  geom_point() + 
+  geom_hline(yintercept = c(3, 2, 0, -2, -3), color = "red", linetype = "dashed") + 
+  geom_smooth(se = FALSE) +
+  ggtitle("Standardized residuals vs linear predictors")+ 
+  labs(x = "Fitted values", y="Standardized Residuals")
+```	
+	
+Alternative models were estimated using quasi-poisson and negative binomial distributions to adjust for the overdispersion and reflect the true distribution. Residual plots revealed moderate improvements using the quasi-poisson model, but there were still outliers and trends in the residuals. The negative binomial model’s residual plot had heteroskedasticity and limited outliers. This negative binomial model had the best data representation and lowest AIC (120,035), which is better than the first three poisson models.The likelihood ratio test for the negative binomial model shows every explanatory variable, except the quadratic temperature and weekday x time-of-day interaction terms, were significant (p<0.001).
+
+According to the negative binomial model results, we find bike rentals decline in the evening and night (model coefficients -0.105 and -0.198 respectively). Bike rentals increase with temperature (coefficient 0.026). Bike rentals are lowest in the winter (coefficient -0.717), and slow to recover in spring. They are higher in summer (coefficient 0.199) and fall. Finally, there are more bike rentals on holidays (coefficient 0.288). We found that the quadratic term of temperature and the interaction term between weekday and time of day did not have significant relationships with rented bike count, so we removed these variables from our final negative binomial model.
+
+The model formula for the quasi poisson is the same as the best poisson model and the formula for the negative binomial model is included below
+
+
+
+\begin{align*} 
+\log(Rented\_Bike\_Count) = & \beta_0 + \beta_1 time.of.day + \beta_2 Temperature + \beta_3 Seasons + \beta_4 Holiday \\
+& + \beta_5 Weekday  + \beta_6 WindSpeed + \beta_7 Visibility + \beta_8 Clear.Day  \\
+& + \beta_{9} Visibility^2 + \beta_{10} WindSpeed^2 + \beta_{11} Temperature \times Seasons  \\
+&+ \beta_{12}Temperature \times time.of.day + u 
+\end{align*}
+
+
+
+```{r include=FALSE}
+# showing over dispersion in poisson model
+
+dispersiontest(model_poisson_3)
+
+```
+
+```{r echo=FALSE}
+model_quasi <- glm(formula = Rented.Bike.Count ~ time.of.day +  Temp + Seasons +
+               Holiday + Weekday + Wind.speed + Visibility + Clear.day +
+               I(Temp**2)  + I(Visibility**2) + I(Wind.speed**2) + 
+               Temp:Seasons + Temp:time.of.day + Weekday:time.of.day,
+             data = seoul.bike1, family = quasipoisson)
+# summary(model_quasi)
+```
+
+```{r include=FALSE}
+# residual plots for poisson model
+pred1 <- predict(model_quasi, type = "response")
+res1 <- residuals(model_quasi, type = "pearson")
+s.res1 <- rstandard(model_quasi, type = "pearson")
+lin.pred1 <- model_quasi$linear.predictors
+
+dfassess1 <- data.frame(seoul.bike1, pred1, res1, s.res1, lin.pred1)
+
+dfassess1 %>%
+  ggplot(aes(x = dfassess1$pred1, y = dfassess1$s.res1)) + 
+  geom_point() + 
+  geom_hline(yintercept = c(3, 2, 0, -2, -3), color = "red", linetype = "dashed") + 
+  geom_smooth(se = FALSE) +
+  ggtitle("Standardized residuals vs fitted values")
+
+
+dfassess1 %>%
+  ggplot(aes(x = dfassess1$lin.pred1, y = dfassess1$s.res1)) + 
+  geom_point() + 
+  geom_hline(yintercept = c(3, 2, 0, -2, -3), color = "red", linetype = "dashed") + 
+  geom_smooth(se = FALSE) +
+  ggtitle("Standardized residuals vs linear predictors")
+```
+
+```{r include=FALSE}
+Anova(model_quasi)
+```
+
+```{r echo=FALSE}
+model_negbi = glm.nb(formula  = Rented.Bike.Count ~ time.of.day +  Temp + Seasons +
+               Holiday + Weekday + Wind.speed + Visibility + Clear.day +
+               I(Temp**2)  + I(Visibility**2) + I(Wind.speed**2) + 
+               Temp:Seasons + Temp:time.of.day + Weekday:time.of.day,
+               data = seoul.bike1)
+```
+
+```{r include=FALSE}
+Anova(model_negbi)
+```
+
+```{r include=FALSE}
+empty_mod <- glm.nb(formula = Rented.Bike.Count ~ 1, data=seoul.bike1)
+forw.sel <- step(object = empty_mod, scope = list(upper = model_negbi), direction = "forward", k=log(nrow(seoul.bike1)))
+forw.sel
+```
+
+```{r echo=FALSE}
+model_final_negbi = glm.nb(formula  = Rented.Bike.Count ~ time.of.day +  Temp + Seasons +
+               Holiday + Weekday + Wind.speed + Visibility + Clear.day + 
+               I(Visibility**2) + I(Wind.speed**2) + 
+               Temp:Seasons + Temp:time.of.day,
+               data = seoul.bike1)
+# summary(model_final_negbi)
+```
+
+
+```{r include=FALSE}
+# residual plots for poisson model
+pred1 <- predict(model_final_negbi, type = "response")
+res1 <- residuals(model_final_negbi, type = "pearson")
+s.res1 <- rstandard(model_final_negbi, type = "pearson")
+lin.pred1 <- model_final_negbi$linear.predictors
+
+dfassess1 <- data.frame(seoul.bike1, pred1, res1, s.res1, lin.pred1)
+
+dfassess1 %>%
+  ggplot(aes(x = dfassess1$pred1, y = dfassess1$s.res1)) + 
+  geom_point() + 
+  geom_hline(yintercept = c(3, 2, 0, -2, -3), color = "red", linetype = "dashed") + 
+  geom_smooth(se = FALSE) +
+  ggtitle("Standardized residuals vs fitted values")
+
+
+dfassess1 %>%
+  ggplot(aes(x = dfassess1$lin.pred1, y = dfassess1$s.res1)) + 
+  geom_point() + 
+  geom_hline(yintercept = c(3, 2, 0, -2, -3), color = "red", linetype = "dashed") + 
+  geom_smooth(se = FALSE) +
+  ggtitle("Standardized residuals vs linear predictors")
+```
+
+## Alternative Specification (10 points)
+
+Finally, we estimated a linear regression model of bike rental and compared its performance against the poisson, negative binomial, and quasi-poisson models. The linear regression of bike rental was estimated using variables from our highest-performing model, the negative binomial model. This included the transformed interaction and quadratic terms. The adjusted R-square of the linear model was 0.4797 or it explained approximately 48% of the variance in bike rental. Unlike the negative binomial model, the linear model coefficients show there was not a significant relationship between time of day and bike rentals. Other trends between seasons, temperature, and holidays were consistent between the two models. 
+	The plots of fitted versus observed values of the linear model showed that there was a significant difference between the predicted and actual bike rentals. This indicated higher error in the linear model than the negative binomial model. The results suggested the negative binomial model was the best fit of the models we tested. 
+
+```{r echo=FALSE}
+lin.reg.mod <- lm(formula = Rented.Bike.Count ~ time.of.day +  Temp + Seasons +
+               Holiday + Weekday + Wind.speed + Visibility + Clear.day + 
+               I(Visibility**2) + I(Wind.speed**2) + 
+               Temp:Seasons + Temp:time.of.day, data = seoul.bike1)
+# summary(lin.reg.mod)
+```
+
+```{r echo=FALSE, fig.cap= "Expected versus predicted bike count", fig.height= 4, fig.width=3.5}
+## calculate and store predicted values
+fitted_values_lin <- predict(lin.reg.mod, type="response")
+fitted_values_pos <- predict(model_quasi, type="response")
+
+## Create the plot
+
+ggplot(seoul.bike1) +
+  geom_point(aes(x = Rented.Bike.Count, y = fitted_values_lin)) +
+  geom_abline(slope=1, intercept = 0, color = "red")+
+  labs(x = "Rented Bike Count", y = "Expected Rented Bike Count Linear Model")
+
+ggplot(seoul.bike1) +
+  geom_point(aes(x = Rented.Bike.Count, y = fitted_values_pos)) +
+  geom_abline(slope=1, intercept = 0, color = "red")+
+  labs(x = "Rented Bike Count", y = "Expected Rented Bike Count Negative Binomial Model")
+
+
+```
+
+
+```{r, echo=FALSE, message=FALSE}
+stargazer(model_poisson_3, model_quasi, model_final_negbi, type = "text", omit.stat = "f",
+          font.size = "tiny",
+                    star.cutoffs = c(0.05, 0.01, 0.001), 
+                    title = "Stargazer table of rented bike count models")
+```
+
+
+# Conclusion (5 points)
+
+Our findings suggest Korean bike rentals depend on a variety of factors, including weather, season, time of day, holiday periods, and day of the week. We test hypotheses related to these variables with three different poisson model specifications, a quasi-poisson model, a negative binomial model (to adjust for dispersion and outliers), and a classic linear regression model. The negative binomial model performed the best in predicting bike rental numbers.
+	
+Our negative binomial model and the likelihood ratio test we conducted on it allows us to reject the null hypothesis that none of the variables - time of day, temperature, season, holidays, and weekdays - have a significant relationship with bike rental numbers at a given time. Our final model found relationships consistent with the alternate hypothesis. Bike rentals decline in the evening and night, bike rentals increase with temperature, rentals are lowest in the winter, and slow to recover in spring. In addition, rentals are higher in summer and fall. Finally, there are more bike rentals on holidays.
+
+Based on our findings, we have the following recommendations for the Seoul Bike Sharing company to prevent bike shortages: 
+
+1. Bike supply needs to be highest during the summer and fall months. Winter may be a preferable time for bike repair and maintenance. 
+2. Additional bikes (and staff) are needed on holidays and weekends.
+3. Stations with highly variable weather will experience more bike demand variability. 
+4. It is important to have plenty of bikes available in the evenings, especially in the summer. For much of the year, night time is the best time to check on bike 4. functioning and conduct short-term repairs. 
+5. In order to meet peak demand, there will likely be an over abundance of bikes on racks during off-peak periods. It may be beneficial to have a covered storage area for bikes during the winter to prevent unneeded deterioration.
+
+We hope that this information is useful for Seoul Bike Sharing to preemptively allocate their resources for peak ridership times and weather conditions.
+
+
+
+

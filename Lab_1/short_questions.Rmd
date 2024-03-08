@@ -34,9 +34,13 @@ Use the factor() function with the ideology variable to ensure that R places the
 voters <- read.csv("pol_ideol_data.csv")
 
 voters$ideol.order <- factor(voters$ideol, levels = c("VL", "SL", "M", "SC", "VC"))
-voters
+voters$gender <- factor(voters$gender)
+voters$party <- factor(voters$party)
 levels(voters$ideol.order)
+voters
+summary(voters)
 
+#factor gender and party as well
 ```
 
 ## Test for Independence (5 points)
@@ -59,6 +63,8 @@ ggplot(voters, aes(fill=gender, y=count, x=ideol.order)) +
     ggtitle("Gender and Ideologies") +
     xlab("Ideologies")
 
+
+#maybe combine graphics
 ```
 
 
@@ -78,6 +84,8 @@ ind.test2 <- chisq.test(x = vg.table, correct = FALSE)
 ind.test2
 
 ```
+The p-values ... show reject null hypthoesis. These variables aren't independent.
+
 
 ## Regression analysis  (5 points)
 
@@ -103,6 +111,7 @@ mod.ordtest <- clm(ideol.order ~ party + gender, data =voters, weights = count)
 
 nominal_test(mod.ordtest)
 ```
+Odds are not proportional. Multinomial model will likely be more accurate.
 
 ## Estimated probabilities  (5 points)
 
@@ -111,6 +120,8 @@ Compute the estimated probabilities for each ideology level given all possible c
 ```{r estimated probabilities for each ideology level}
 v.table <- xtabs(formula = count ~ ideol.order + gender + party, data = voters)
 v.table/rowSums(v.table)
+
+# get probabilities from multi.mod
 ```
 
 ## Contingency table of estimated counts (5 points)
@@ -123,13 +134,14 @@ For example, there are 264 observations for gender = "F" and party = "D". Becaus
 
 ```{r}
 cont.table <- xtabs(formula = count ~ party + ideol.order + gender, data = voters)
-#cont.table
+cont.table
 flattened <- ftable(x = cont.table, row.vars = c("gender", "party"), col.vars = "ideol.order")
 flatdata <- as.data.frame(flattened)
 pihat <- predict(object = multi.mod, newdata = flatdata[1:4,], type = "probs")
 estprob <- data.frame(gender = flatdata[1:4,], party = flatdata[1:4, 2], round(pihat, 4))
-estcounts <- estprob[, 6:10] * flattened[, 0:5]
-estcounts
+estcounts <- estprob[, 6:10] * rowSums(flattened[, 0:5])
+est_counts_labeled <- data.frame(gender = flatdata[1:4,1], party = flatdata[1:4, 2], round(estcounts, 4))
+est_counts_labeled
 ```
 
 
@@ -139,6 +151,7 @@ estcounts
 
 ```{r a contingency table with estimated counts}
 pihat
+estcounts
 #v.table
 #coefficients(multi.mod)
 #pi.hat.ord <- predict(object = multi.mod, type = "probs")
@@ -155,6 +168,8 @@ chisq.test(x = estcounts, correct = FALSE)
 To better understand relationships between the explanatory variables and the response, compute odds ratios and their confidence intervals from the estimated models and interpret them.
 
 ```{r Odds ratios and confidence intervals}
+#sds <- apply(X = voters, MARGIN = 2, FUN = sd)
+#c.value <- c(1, sds) # class = 1 is first value
 exp(pol.mod$coefficients)
 cip <- confint(object = pol.mod, level = 0.95)
 exp(cip)
