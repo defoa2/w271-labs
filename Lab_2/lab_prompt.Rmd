@@ -78,71 +78,152 @@ df_co2 %>%
 
 
 ```{r}
-lags <- df_co2 %>%
-  gg_lag(value, geom = "point", lag=6:8) +
-  labs(title = "Lagged scatterplots",
-       y = "Co2 Levels",x = "lag(value, k)")
-
-acf_vals <- df_co2 %>%
-  ACF(value, lag_max = 48) %>%
-  autoplot() + labs(title="Monthly Co2 levels")
-
-grid.arrange(lags,acf_vals, nrow = 1, ncol = 2)
+# lags <- df_co2 %>%
+#   gg_lag(value, geom = "point", lag=6:8) +
+#   labs(title = "Lagged scatterplots",
+#        y = "Co2 Levels",x = "lag(value, k)")
+# 
+# acf_vals <- df_co2 %>%
+#   ACF(value, lag_max = 48) %>%
+#   autoplot() + labs(title="Monthly Co2 levels")
+# 
+# lags
+# acf_vals
 ```
-```{r}
-lags
-```
+
+
 
 ```{r}
 df_co2 %>%
   ggplot() +aes(x=index, y=log(value)) + geom_line() + ggtitle("log CO2 Levels 1960-1998") + xlab("Year/Month") + ylab("log Co2 levels")
 ```
 
+
+
 ```{r}
-seasonalplot <-df_co2 %>%
-  gg_season(value, labels = "both") +
-  labs(y = "CO2 Levels", x = "Month",
-       title = "Seasonal plot: Co2 Levels 1960-1998")
-seasonalplot
+#Seasonal Plot 
+df_co2 %>% 
+  gg_season(value, labels="both") + 
+  labs(y= "CO2 (ppm)",
+       title = "Seasonal Plot: CO2 Levels in Mauna Observatory, Hawaii",
+       x = "Month")
+ 
+```
+```{r}
+#Seasonal Subseries plot 
+df_co2 %>% gg_subseries(value) + 
+  labs(
+    y = "CO2 (ppm)",
+    title = "Seasonal Subseries Plots of CO2 Levels at Mauna Observatory, Hawaii"
+  )
 ```
 
 ```{r}
-PBS |>
-  filter(ATC2 == "H02") |>
-  summarise(Cost = sum(Cost)/1e6) |>
-  transmute(
-    `Sales ($million)` = Cost,
-    `Log sales` = log(Cost),
-    `Annual change in log sales` = difference(log(Cost), 12),
-    `Doubly differenced log sales` =
-                     difference(difference(log(Cost), 12), 1)
-  ) |>
-  pivot_longer(-Month, names_to="Type", values_to="Sales") |>
-  mutate(
-    Type = factor(Type, levels = c(
-      "Sales ($million)",
-      "Log sales",
-      "Annual change in log sales",
-      "Doubly differenced log sales"))
-  ) |>
-  ggplot(aes(x = Month, y = Sales)) +
-  geom_line() +
-  facet_grid(vars(Type), scales = "free_y") +
-  labs(title = "Corticosteroid drug sales", y = NULL)
-```
+#Lab Plots 
+CO2_lags <- df_co2 %>% 
+  gg_lag(value, geom = 'point') + 
+  labs(x = "lag(value,k)", 
+       title = "Lag Plots for CO2 (ppm)")
 
+
+CO2_ACF <- df_co2 %>% 
+  ACF(value) %>% 
+  autoplot() + labs(title = "The ACF for CO2 (ppm) at Muana Observatory")
+
+CO2_lags |  CO2_ACF  
+```
+```{r}
+#Trend
+df_co2 %>% 
+  autoplot(value, colour = "grey") + 
+  #geom_lines(aes(y=value), colour = "#D55E00") + 
+  labs(
+    y = "CO2 (ppm)", 
+    x = "time", 
+    title = "CO2 levels in Mauna, Hawaii"
+  )
+```
 
 ## (3 points) Task 2a: Linear time trend model
 
 Fit a linear time trend model to the `co2` series, and examine the characteristics of the residuals. Compare this to a quadratic time trend model. Discuss whether a logarithmic transformation of the data would be appropriate. Fit a polynomial time trend model that incorporates seasonal dummy variables, and use this model to generate forecasts to the year 2020. 
+```{r}
+# Fit a linear time trend model
+linear_model <- lm(co2 ~ time(co2))
+
+# Examine characteristics of residuals
+residuals_linear <- residuals(linear_model)
+plot(residuals_linear, type = "l", main = "Residuals of Linear Model")
+
+# Fit a quadratic time trend model
+quadratic_model <- lm(co2 ~ time(co2) + I(time(co2)^2))
+
+# Examine characteristics of residuals
+residuals_quadratic <- residuals(quadratic_model)
+plot(residuals_quadratic, type = "l", main = "Residuals of Quadratic Model")
+
+# Test for logarithmic transformation
+log_model <- lm(log(co2) ~ time(co2))
+summary(log_model)
+
+
+# Fit a polynomial time trend model with seasonal dummies
+
+    
+# poly_terms <- poly(co2, degree = 12)
+#     
+# polynomial_model <- lm(co2[[value]] ~ poly_terms)
+
+
+# Generate forecasts to the year 2020
+# forecast_polynomial <- forecast(polynomial_model, h = 2020 - end(co2))
+# plot(forecast_polynomial, main = "Forecast of CO2 Levels with Polynomial Time Trend Model")
+
+
+
+```
+
 
 ## (3 points) Task 3a: ARIMA times series model 
 
 Following all appropriate steps, choose an ARIMA model to fit to the series. Discuss the characteristics of your model and how you selected between alternative ARIMA specifications. Use your model (or models) to generate forecasts to the year 2022. 
 
+```{r}
+#computing Ljung-Box q* statistic for monthly differences
+df_co2 %>% mutate(diff_year = difference(value)) %>% 
+  features(diff_year, ljung_box, lag = 2) #p<0.05 The monthly change in CO2 levels is not random and relates to previous periods
+
+#Seasonal differencing, m = 12 or yt' = yt - yt-12
+df_co2 %>% 
+  autoplot(value %>% 
+             difference (12)
+           ) +
+  labs(title = "Annual change in CO2 (ppm)--Difference Order 12",
+       y = "CO2 (ppm)", 
+       x = "Year-Month")
+
+```
+```{r}
+#Unit root tests 
+df_co2 %>% 
+  features(value, unitroot_kpss) #Reject null, differencing is required
+```
+```{r}
+fit <- df_co2 %>% 
+  model(ARIMA(value)) 
+report (fit)
+```
+
 ## (3 points) Task 4a: Forecast atmospheric CO2 growth 
 
 Generate predictions for when atmospheric CO2 is expected to be at [420 ppm](https://research.noaa.gov/article/ArtMID/587/ArticleID/2764/Coronavirus-response-barely-slows-rising-carbon-dioxide) and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2100. How confident are you that these will be accurate predictions?
+
+```{r}
+fit %>% forecast(h=12) %>% 
+  autoplot(co2) + 
+  labs(y="% of GDP", title = "Egyptian Exports")
+```
+
 
 # Report from the Point of View of the Present 
 
@@ -152,6 +233,9 @@ One of the very interesting features of Keeling and colleagues' research is that
 
 In this introduction, you can assume that your reader will have **just** read your 1997 report. In this introduction, **very** briefly pose the question that you are evaluating, and describe what (if anything) has changed in the data generating process between 1997 and the present. 
 
+
+
+
 ## (3 points) Task 1b: Create a modern data pipeline for Mona Loa CO2 data.
 
 The most current data is provided by the United States' National Oceanic and Atmospheric Administration, on a data page [[here](https://gml.noaa.gov/ccgg/trends/data.html)]. Gather the most recent weekly data from this page. (A group that is interested in even more data management might choose to work with the [hourly data](https://gml.noaa.gov/aftp/data/trace_gases/co2/in-situ/surface/mlo/co2_mlo_surface-insitu_1_ccgg_HourlyData.txt).) 
@@ -159,6 +243,39 @@ The most current data is provided by the United States' National Oceanic and Atm
 Create a data pipeline that starts by reading from the appropriate URL, and ends by saving an object called `co2_present` that is a suitable time series object. 
 
 Conduct the same EDA on this data. Describe how the Keeling Curve evolved from 1997 to the present, noting where the series seems to be following similar trends to the series that you "evaluated in 1997" and where the series seems to be following different trends. This EDA can use the same, or very similar tools and views as you provided in your 1997 report. 
+
+
+```{r}
+co2_present <- read.csv("co2_weekly_mlo.csv")
+co2_present <- co2_present %>%
+  mutate(time_index = yearweek(make_datetime(year, month, day))) %>%
+  as_tsibble(index = time_index)
+co2_present
+```
+
+```{r}
+co2_present %>%
+  ggplot() +aes(x=time_index, y=average) + geom_line() + ggtitle("log CO2 Levels 19997-Present") + xlab("Year/Month") + ylab("log Co2 levels")
+```
+
+
+
+```{r}
+#Lab Plots 
+CO2_lags <- co2_present %>% 
+  gg_lag(average, geom = 'point') + 
+  labs(x = "lag(value,k)", 
+       title = "Lag Plots for CO2 (ppm)")
+
+
+CO2_ACF <- co2_present %>% 
+  ACF(average) %>% 
+  autoplot() + labs(title = "The ACF for CO2 (ppm) at Muana Observatory")
+
+CO2_lags |  CO2_ACF 
+```
+
+
 
 ## (1 point) Task 2b: Compare linear model forecasts against realized CO2
 
