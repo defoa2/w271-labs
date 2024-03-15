@@ -267,6 +267,12 @@ CO2_ACF <- co2_present %>%
 
 CO2_lags |  CO2_ACF 
 ```
+```{r}
+CO2_PACF <- co2_present %>% 
+  ACF(mean, type = "partial") %>% 
+  autoplot() + labs(title = "The PACF for CO2 (ppm) at Muana Observatory")
+CO2_PACF
+```
 
 
 ## (1 point) Task 2b: Compare linear model forecasts against realized CO2
@@ -359,6 +365,10 @@ resid.p <- polynomial_model %>%
 Box.test(resid.p, lag = 10, type = "Ljung-Box")
 ```
 
+```{r}
+forecast_arima_acc  <- forecast(sar_bic, h = 312)
+accuracy(forecast_arima_acc$.mean, windowed$mean)
+```
 
 
 ```{r}
@@ -390,8 +400,37 @@ Box.test(resid.sar, lag = 10, type = "Ljung-Box")
 
 Seasonally adjust the weekly NOAA data, and split both seasonally-adjusted (SA) and non-seasonally-adjusted (NSA) series into training and test sets, using the last two years of observations as the test sets. For both SA and NSA series, fit ARIMA models using all appropriate steps. Measure and discuss how your models perform in-sample and (psuedo-) out-of-sample, comparing candidate models and explaining your choice. In addition, fit a polynomial time-trend model to the seasonally-adjusted series and compare its performance to that of your ARIMA model.
 
-```{r}
 
+```{r message = FALSE}
+co2_ts <- co2_present %>%
+  dplyr::select(time_index, mean) %>%
+  ungroup() %>%
+  dplyr::select(-year)
+#co2_ts 
+co2.ts <- ts(as.numeric(co2_ts$mean), start = c(1974,5), end = c(2024,3), frequency = 12)
+head(co2.ts)
+```
+
+
+```{r}
+decompose_co2 = decompose(co2.ts, "additive")
+```
+
+
+```{r}
+adjust_co2 = decompose_co2$x - decompose_co2$seasonal
+plot(adjust_co2)
+```
+```{r}
+# adjust_co2 <- adjust_co2 %>%
+#   as_tsibble()
+# seasonally_adjusted_train <- adjust_co2 %>%
+#   filter_index(~ "2022-3")
+# 
+# seasonally_adjusted_test <- adjust_co2 %>%
+#   filter_index("2022-3" ~.)
+
+#decompose_co2
 ```
 
 
