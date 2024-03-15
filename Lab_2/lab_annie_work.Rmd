@@ -20,6 +20,7 @@ library(feasts)
 library(forecast)
 library(fable)
 library(gridExtra)
+library(readr)
 theme_set(theme_minimal())
 knitr::opts_chunk$set(dpi=1000)
 ```
@@ -112,7 +113,15 @@ linear_model <- lm(co2 ~ time(co2))
 
 # Examine characteristics of residuals
 residuals_linear <- residuals(linear_model)
-resid1 <- plot(residuals_linear, type = "l", main = "Residuals of Linear Model")
+# resid1 <- plot(residuals_linear, type = "l", main = "Residuals of Linear Model")
+
+#plot of linear model
+lin_plot <- df_co2 %>%
+  ggplot() + geom_point(aes(x= index, y = value))  + 
+  geom_line(aes(x = index, y=linear_model$fitted), color = 'blue') + 
+  labs(title = "Fitted Linear Model",
+       x = 'time',
+       y = 'CO2 (ppm)')
 
 #comment out log-linear model
 # # add log linear model
@@ -128,11 +137,19 @@ quadratic_model <- lm(co2 ~ time(co2) + I(time(co2)^2))
 
 # Examine characteristics of residuals
 residuals_quadratic <- residuals(quadratic_model)
-resid2 <- plot(residuals_quadratic, type = "l", main = "Residuals of Quadratic Model")
+# resid2 <- plot(residuals_quadratic, type = "l", main = "Residuals of Quadratic Model")
+
+#plot of quadratic model
+quad_plot <- df_co2 %>%
+  ggplot() + geom_point(aes(x= index, y = value))  + 
+  geom_line(aes(x = index, y=quadratic_model$fitted), color = 'blue') + 
+  labs(title = "Fitted Quadratic Model",
+       x = 'time',
+       y = 'CO2 (ppm)')
 
 # Test for logarithmic transformation
-log_model <- lm(log(co2) ~ time(co2))
-summary(log_model)
+# log_model <- lm(log(co2) ~ time(co2))
+# summary(log_model)
 
 
 # Fit a polynomial time trend model with seasonal dummies
@@ -142,34 +159,45 @@ poly_terms <- poly(co2, degree = 12)
 
 # adding seasonal dummy variable to code update 3/8
 # try different degrees??
-polynomial_model <- df_co2 %>% model(trend_model = TSLM(formula = value ~ poly(trend(), degree = 3) + season()))
+polynomial_model <- df_co2 %>% model(trend = TSLM(value ~ trend() + I(trend()^2) + I(trend()^3) + season()))
 
-residuals_poly <- residuals(polynomial_model)
-resid3 <- plot(residuals_quadratic, type = "l", main = "Residuals of Quadratic Model")
+residuals_poly <- residuals(polynomial_model)$.resid
+# resid3 <- plot(residuals_poly, type = 'l', main = "Residuals of Polynomia Model")
 
-plot <- df_co2 %>%
+# plot of polynomial model 
+poly_plot <- df_co2 %>%
   ggplot() + geom_point(aes(x= index, y = value))  + 
-  geom_line(aes(x = index, y=fitted(polynomial_model)$.fitted))
-grid.arrange()
-grid.arrange(resid1, resid2, resid3, ncol=3)
+  geom_line(aes(x = index, y=fitted(polynomial_model)$.fitted), color = 'blue') + 
+  labs(title = "Fitted Polynomial Model",
+       x = 'time',
+       y = 'CO2 (ppm)')
+
+par(mfrow=c(1,3))  
+plot(residuals_linear, main = "Residuals of Linear Model")
+plot(residuals_quadratic, main = "Residuals of Quadratic Model")
+plot(residuals_poly, main = "Residuals of Polynomial Model")
+
+grid.arrange(lin_plot, quad_plot, poly_plot, ncol=3)
+# grid.arrange(resid1, resid2, ncol=2)
 # Generate forecasts to the year 2020
 forecast_polynomial <- forecast(polynomial_model, h = 276)
-forecast_polynomial %>% ggplot(aes(x = index, y=.mean)) + geom_line()
+# forecast_polynomial %>% ggplot(aes(x = index, y=.mean)) + geom_line()
 
-mod_names <- c("linear", "log-linear", "quadratic", "polynomial")
-mod_aic <- c(AIC(linear_model), AIC(log_linear_model), AIC(quadratic_model), glance(polynomial_model)$AIC)
-mod_bic <- c(BIC(linear_model), BIC(log_linear_model), BIC(quadratic_model), glance(polynomial_model)$BIC)
+mod_names <- c("linear", "quadratic", "polynomial")
+mod_aic <- c(AIC(linear_model),  AIC(quadratic_model), glance(polynomial_model)$AIC)
+mod_bic <- c(BIC(linear_model),  BIC(quadratic_model), glance(polynomial_model)$BIC)
 
 mod_table <- cbind(mod_names, mod_aic, mod_bic)
 mod_table
 ```
-
 ```{r}
-plot <- df_co2 %>%
-  ggplot() + geom_point(aes(x= index, y = value))  + 
-  geom_line(aes(x = index, y=fitted(polynomial_model)$.fitted))
-plot
+# use polynomial model to forecast to 2020
+forecast_polynomial %>%
+autoplot(colour="cornflowerblue") +
+autolayer(df_co2, colour="black") +
+geom_line(data=polynomial_model %>% augment(), aes(index,.fitted,color=.model))
 ```
+
 
 
 ## (3 points) Task 3a: ARIMA times series model 
@@ -192,7 +220,7 @@ The time series plot shows an increasing average as time increases. The histogra
 # selection with AIC
 # model selection with AIC
 model.aic<- df_co2 %>%
-  model(ARIMA(value ~ 1 + pdq(0:10,0:2,0:10) + PDQ(1:2,1:2,1:2),
+  model(ARIMA(value ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0,0,0),
               ic="aic", stepwise=F, greedy=F))
 
 model.aic %>%
@@ -218,7 +246,16 @@ model.bic %>%
 
 
 *Model Interpretation*
-Model selection across AIC, AICc, and BIC all chose an ARIMA model with 2 AR parameters, 4 MA parameters and linear differencing.
+Model selection across AIC, AICc, and BIC all chose an ARIMA model with 2 AR parameters, 4 MA parameters and linear differencing. However, from looking at the ACF and PACF plots, below there is signs that there are still unaccounted seasonality trends that could be incorporated into the model.
+
+```{r}
+# testing performance of ARIMA(2, 1, 4)
+
+#plots
+plot(resid(model.aic)$.resid, main = "Residual plot")
+acf(resid(model.aic)$.resid, main = "ACF")
+pacf(resid(model.aic)$.resid, main = "PACF")
+```
 
 ```{r}
 sar_aic <- df_co2 %>% 
@@ -241,19 +278,15 @@ pacf(resid(sar_bic)$.resid, main = "PACF")
 ```
 
 
-```{r}
-# testing performance of ARIMA(2, 1, 4)
 
-#plots
-plot(resid(model.aic)$.resid, main = "Residual plot")
-acf(resid(model.aic)$.resid, main = "ACF")
-pacf(resid(model.aic)$.resid, main = "PACF")
-```
 
 ```{r}
 # forecast to the 2022
 forecast_arima <- forecast(sar_bic, h = 300)
-forecast_arima %>% ggplot(aes(x = index, y=.mean)) + geom_line()
+forecast_arima %>%
+autoplot(colour="cornflowerblue") +
+autolayer(df_co2, colour="black") +
+geom_line(data=sar_bic %>% augment(), aes(index,.fitted,color=.model))
 ```
 
 
@@ -268,9 +301,7 @@ long_forecast_arima = forecast(sar_bic, h = 700)
 long_forecast_arima[min(which(long_forecast_arima$.mean > 420)), 'index'] # first time larger than 420
 ```
 
-```{r}
-glance(polynomial_model)
-```
+
 
 # Report from the Point of View of the Present 
 
@@ -288,6 +319,23 @@ Create a data pipeline that starts by reading from the appropriate URL, and ends
 
 Conduct the same EDA on this data. Describe how the Keeling Curve evolved from 1997 to the present, noting where the series seems to be following similar trends to the series that you "evaluated in 1997" and where the series seems to be following different trends. This EDA can use the same, or very similar tools and views as you provided in your 1997 report. 
 
+```{r}
+# download and use the CSV
+
+# weekly data url
+weekly_url <- 'https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_weekly_mlo.txt'
+# download file into weekly csv
+download.file(weekly_url, "weekly.csv")
+# create headings
+headings = c("year", "month", "day", "decimal", "average", "ndays", "1_yr_ago", "10_yrs_ago", "increase_since_1800")
+# read into and format dataframe
+new_co2_w<- read.table("weekly.csv", header=FALSE, quote="\"", stringsAsFactors=TRUE)
+colnames(new_co2_w) <- headings
+co2_present <- new_co2_w %>%
+  mutate(time_index = as.Date(make_datetime(year, month, day))) %>% as_tsibble(index = time_index)
+head(co2_present)
+```
+
 ## (1 point) Task 2b: Compare linear model forecasts against realized CO2
 
 Descriptively compare realized atmospheric CO2 levels to those predicted by your forecast from a linear time model in 1997 (i.e. "Task 2a"). (You do not need to run any formal tests for this task.) 
@@ -301,9 +349,7 @@ Descriptively compare realized atmospheric CO2 levels to those predicted by your
 In 1997 you made predictions about the first time that CO2 would cross 420 ppm. How close were your models to the truth? 
 
 After reflecting on your performance on this threshold-prediction task, continue to use the weekly data to generate a month-average series from 1997 to the present, and compare the overall forecasting performance of your models from Parts 2a and 3b over the entire period. (You should conduct formal tests for this task.) 
-```{r}
-# accuracy() ?
-```
+
 
 ## (4 points) Task 5b: Train best models on present data
 
