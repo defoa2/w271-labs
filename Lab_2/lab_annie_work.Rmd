@@ -367,9 +367,22 @@ real_data <- co2_present %>%
 lin_forecast <- forecast(linear_model, h=314)
 lin_forecast_df <- data.frame(lin_forecast)
 lin_forecast_df$index = yearmonth(row.names(lin_forecast_df))
+
+# plot without SE
+# comp_plot <- lin_forecast_df %>%
+#   ggplot() + aes(x=index, y = Point.Forecast, color = "ARIMA Model") + geom_line() + 
+#   geom_line(data=real_data, aes(x=time_index, y =average, color = "Actual")) +
+#   ggtitle("Comparing Actual vs Predicted")
+# 
+# comp_plot
+
+# plot with 80 & 95% ribbons
 comp_plot <- lin_forecast_df %>%
   ggplot() + aes(x=index, y = Point.Forecast, color = "ARIMA Model") + geom_line() + 
+  geom_ribbon(aes(ymax = Hi.80, ymin = Lo.80, fill = "80%"), alpha = 0.4, color = NA) + 
+  geom_ribbon(aes(ymax = Hi.95, ymin = Lo.95, fill = "95%"), alpha = 0.2, color = NA) +
   geom_line(data=real_data, aes(x=time_index, y =average, color = "Actual")) +
+  scale_fill_manual("", values = c("blue", "blue")) + 
   ggtitle("Comparing Actual vs Predicted")
 
 comp_plot
@@ -380,9 +393,7 @@ comp_plot
 # grid.arrange(twoa_plot, twob_plot, ncol = 2)
 ```
 
-```{r}
-1:326
-```
+
 
 
 ## (1 point) Task 3b: Compare ARIMA models forecasts against realized CO2  
@@ -390,8 +401,16 @@ comp_plot
 Descriptively compare realized atmospheric CO2 levels to those predicted by your forecast from the ARIMA model that you fitted in 1997 (i.e. "Task 3a"). Describe how the Keeling Curve evolved from 1997 to the present.
 
 ```{r}
+# without SE
+# comp_plot <- forecast_arima %>%
+#   ggplot() + aes(x=index, y = .mean, color = "ARIMA Model") + geom_line() + 
+#   geom_line(data=real_data, aes(x=time_index, y =average, color = "Actual")) +
+#   ggtitle("Comparing Actual vs Predicted")
+# 
+# comp_plot
+
 comp_plot <- forecast_arima %>%
-  ggplot() + aes(x=index, y = .mean, color = "ARIMA Model") + geom_line() + 
+  autoplot() + 
   geom_line(data=real_data, aes(x=time_index, y =average, color = "Actual")) +
   ggtitle("Comparing Actual vs Predicted")
 
