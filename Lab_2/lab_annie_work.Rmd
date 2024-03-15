@@ -19,6 +19,7 @@ library(latex2exp)
 library(feasts)
 library(forecast)
 library(fable)
+library(gridExtra)
 theme_set(theme_minimal())
 knitr::opts_chunk$set(dpi=1000)
 ```
@@ -72,18 +73,36 @@ df_co2 <- as_tsibble(co2)
 
 
 ```{r create season column}
-df_co2$season <- ifelse(month(df_co2$index)== 3 | month(df_co2$index)== 4 | month(df_co2$index)== 5, "spring", NA)
-df_co2$season <- ifelse(month(df_co2$index)== 6 | month(df_co2$index)== 7 | month(df_co2$index)== 8, "summer", df_co2$season)
-df_co2$season <- ifelse(month(df_co2$index)== 9 | month(df_co2$index)== 10 | month(df_co2$index)== 11, "fall", df_co2$season)
-df_co2$season <- ifelse(month(df_co2$index)== 12 | month(df_co2$index)== 1 | month(df_co2$index)== 2, "winter", df_co2$season)
-
-df_co2$season <- as.factor(df_co2$season)
-head(df_co2)
+# commented out because unnecessary
+# df_co2$season <- ifelse(month(df_co2$index)== 3 | month(df_co2$index)== 4 | month(df_co2$index)== 5, "spring", NA)
+# df_co2$season <- ifelse(month(df_co2$index)== 6 | month(df_co2$index)== 7 | month(df_co2$index)== 8, "summer", df_co2$season)
+# df_co2$season <- ifelse(month(df_co2$index)== 9 | month(df_co2$index)== 10 | month(df_co2$index)== 11, "fall", df_co2$season)
+# df_co2$season <- ifelse(month(df_co2$index)== 12 | month(df_co2$index)== 1 | month(df_co2$index)== 2, "winter", df_co2$season)
+# 
+# df_co2$season <- as.factor(df_co2$season)
+# head(df_co2)
 ```
 
 ## (3 points) Task 2a: Linear time trend model
 
 Fit a linear time trend model to the `co2` series, and examine the characteristics of the residuals. Compare this to a quadratic time trend model. Discuss whether a logarithmic transformation of the data would be appropriate. Fit a polynomial time trend model that incorporates seasonal dummy variables, and use this model to generate forecasts to the year 2020. 
+
+
+
+The data has a pretty linear trend with equal variance throughout the data. From the plot, you can see that a log transformation does not help with linearizing the data. Therefore, there is no transformation that is required for this data
+```{r}
+# plot showing log transformation
+plot1 <- df_co2 %>%
+  ggplot() + geom_point(aes(x= index, y = value)) +
+  labs(title = "Untransformed Data")
+plot2 <- df_co2 %>%
+  ggplot() + geom_point(aes(x= index, y = log(value))) +
+  labs(title = "Log Transformation Data")
+
+grid.arrange(plot1, plot2, ncol = 2)
+```
+
+
 
 ```{r}
 #### 2A NORA WORK FROM 3/5
@@ -93,14 +112,23 @@ linear_model <- lm(co2 ~ time(co2))
 
 # Examine characteristics of residuals
 residuals_linear <- residuals(linear_model)
-plot(residuals_linear, type = "l", main = "Residuals of Linear Model")
+resid1 <- plot(residuals_linear, type = "l", main = "Residuals of Linear Model")
+
+#comment out log-linear model
+# # add log linear model
+# log_linear_model <- lm(log(co2) ~ time(co2))
+# 
+# # Examine characteristics of residuals
+# residuals_log_lin <- residuals(log_linear_model)
+# plot(residuals_log_lin, type = "l", main = "Residuals of Linear Model")
+
 
 # Fit a quadratic time trend model
 quadratic_model <- lm(co2 ~ time(co2) + I(time(co2)^2))
 
 # Examine characteristics of residuals
 residuals_quadratic <- residuals(quadratic_model)
-plot(residuals_quadratic, type = "l", main = "Residuals of Quadratic Model")
+resid2 <- plot(residuals_quadratic, type = "l", main = "Residuals of Quadratic Model")
 
 # Test for logarithmic transformation
 log_model <- lm(log(co2) ~ time(co2))
@@ -114,17 +142,34 @@ poly_terms <- poly(co2, degree = 12)
 
 # adding seasonal dummy variable to code update 3/8
 # try different degrees??
-polynomial_model <- df_co2 %>% model(trend_model = TSLM(formula = value ~ poly(trend(), degree = 4) + season()))
+polynomial_model <- df_co2 %>% model(trend_model = TSLM(formula = value ~ poly(trend(), degree = 3) + season()))
 
+residuals_poly <- residuals(polynomial_model)
+resid3 <- plot(residuals_quadratic, type = "l", main = "Residuals of Quadratic Model")
 
+plot <- df_co2 %>%
+  ggplot() + geom_point(aes(x= index, y = value))  + 
+  geom_line(aes(x = index, y=fitted(polynomial_model)$.fitted))
+grid.arrange()
+grid.arrange(resid1, resid2, resid3, ncol=3)
 # Generate forecasts to the year 2020
 forecast_polynomial <- forecast(polynomial_model, h = 276)
 forecast_polynomial %>% ggplot(aes(x = index, y=.mean)) + geom_line()
 
+mod_names <- c("linear", "log-linear", "quadratic", "polynomial")
+mod_aic <- c(AIC(linear_model), AIC(log_linear_model), AIC(quadratic_model), glance(polynomial_model)$AIC)
+mod_bic <- c(BIC(linear_model), BIC(log_linear_model), BIC(quadratic_model), glance(polynomial_model)$BIC)
 
-
+mod_table <- cbind(mod_names, mod_aic, mod_bic)
+mod_table
 ```
 
+```{r}
+plot <- df_co2 %>%
+  ggplot() + geom_point(aes(x= index, y = value))  + 
+  geom_line(aes(x = index, y=fitted(polynomial_model)$.fitted))
+plot
+```
 
 
 ## (3 points) Task 3a: ARIMA times series model 
@@ -184,6 +229,8 @@ sar_bic <- df_co2 %>%
   model(ARIMA(value, ic = 'bic')) 
 report (sar_bic)
 ```
+
+
 ```{r}
 # testing performance of SARIMA
 
@@ -221,6 +268,9 @@ long_forecast_arima = forecast(sar_bic, h = 700)
 long_forecast_arima[min(which(long_forecast_arima$.mean > 420)), 'index'] # first time larger than 420
 ```
 
+```{r}
+glance(polynomial_model)
+```
 
 # Report from the Point of View of the Present 
 
