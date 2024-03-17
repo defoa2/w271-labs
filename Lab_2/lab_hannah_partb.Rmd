@@ -285,6 +285,14 @@ co2_present %>%
 #   autoplot(mean)
 summary(co2_present$average)
 ```
+```{r}
+co2_present_mnth <- co2_present %>% 
+  index_by(mnth = yearmonth(as.POSIXlt(time_index, format="%Y-%m-%d"))) %>% 
+  summarise(mean = mean(average))
+co2_present_mnth
+```
+
+
 
 ```{r}
 CO2_lags <- co2_present %>% 
@@ -332,7 +340,7 @@ comp_plot <- lin_forecast_df %>%
   ggplot() + aes(x=index, y = Point.Forecast, color = "Linear Model") + geom_line() + 
   geom_ribbon(aes(ymax = Hi.80, ymin = Lo.80, fill = "80%"), alpha = 0.4, color = NA) + 
   geom_ribbon(aes(ymax = Hi.95, ymin = Lo.95, fill = "95%"), alpha = 0.2, color = NA) +
-  geom_line(data=real_data, aes(x=time_index, y =average, color = "Actual")) +
+  geom_line(data=co2_present_mnth, aes(x=mnth, y =mean, color = "Actual")) +
   scale_fill_manual("", values = c("blue", "blue")) + 
   ggtitle("Comparing Actual vs Predicted") + ylab("co2") + xlab("Time")
 
@@ -366,7 +374,7 @@ Descriptively compare realized atmospheric CO2 levels to those predicted by your
 
 comp_plot <- forecast_arima %>%
   autoplot() + 
-  geom_line(data=real_data, aes(x=time_index, y =average, color = "Actual")) +
+  geom_line(data=co2_present_mnth, aes(x=mnth, y =mean, color = "Actual")) +
   ggtitle("Comparing Actual vs Predicted") + ylab("co2") + xlab("Time")
 
 comp_plot
@@ -399,9 +407,9 @@ co2_present
 
 
 ```{r}
-co2_present_mnth <- co2_present %>% 
-  index_by(mnth = yearmonth(as.POSIXlt(time_index, format="%Y-%m-%d"))) %>% 
-  summarise(mean = mean(average))
+# co2_present_mnth <- co2_present %>% 
+#   index_by(mnth = yearmonth(as.POSIXlt(time_index, format="%Y-%m-%d"))) %>% 
+#   summarise(mean = mean(average))
 
 windowed <- co2_present_mnth %>%
   filter_index("1998-1"~ "2023-12")
