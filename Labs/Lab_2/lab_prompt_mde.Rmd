@@ -179,6 +179,8 @@ df_co2 %>%
 fit <- df_co2 %>% 
   model(ARIMA(value)) 
 report (fit)
+
+
 ```
 
 
