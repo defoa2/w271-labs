@@ -21,6 +21,8 @@ library(forecast)
 library(fable)
 library(gridExtra)
 library(readr)
+library(distributional)
+library(reshape2)
 theme_set(theme_minimal())
 knitr::opts_chunk$set(dpi=1000)
 ```
@@ -299,8 +301,155 @@ Generate predictions for when atmospheric CO2 is expected to be at [420 ppm](htt
 # add prediction intervals
 long_forecast_arima = forecast(sar_bic, h = 700)
 long_forecast_arima[min(which(long_forecast_arima$.mean > 420)), 'index'] # first time larger than 420
+
+predict_int = function(row) {
+  mu = row[1]
+  sigma = row[2]
+  me <- qnorm(0.975)*sigma
+  return(c(lo = mu - me, hi = mu + me))
+}
+
+predict_int(mu = unname(unlist(d_var))[1], sigma =unname(unlist(d_var))[2])
 ```
 
+
+```{r}
+# arima forecast
+long_forecast_arima = forecast(sar_bic, h = 1500)
+
+# dist_param = data.frame(cbind(names(unlist(long_forecast_arima$value)), unname(unlist(long_forecast_arima$value))))
+# 
+# mu <- as.integer(dist_param$X2[(dist_param$X1 == "mu")])
+# sigma <- as.numeric(dist_param$X2[(dist_param$X1 == "sigma")])
+
+dist_param = parameters(long_forecast_arima$value)
+
+arima_ci <- apply(data.frame(dist_param),1,  predict_int)
+
+arima_lo <- arima_ci[1, ]
+arima_hi <- arima_ci[2, ]
+
+# polynomial forecast
+long_forecast_polynomial = forecast(polynomial_model, h = 1000)
+
+dist_param = parameters(long_forecast_polynomial$value)
+
+poly_ci <- apply(dist_param,1,  predict_int)
+
+poly_lo <- poly_ci[1, ]
+poly_hi <- poly_ci[2, ]
+
+# quadratic forecast
+long_forecast_quadratic = forecast(quadratic_model, h = 1500)
+
+dist_param = parameters(long_forecast_quadratic$value)
+
+quad_ci <- apply(dist_param,1,  predict_int)
+
+quad_lo <- quad_ci[1, ]
+quad_hi <- quad_ci[2, ]
+
+# linear forecast
+long_forecast_linear = data.frame(forecast(linear_model, h = 1500))
+long_forecast_linear$index = yearmonth(row.names(long_forecast_linear))
+```
+
+
+```{r}
+idx = long_forecast_arima$index
+plot <- ggplot()  + geom_line(data = long_forecast_arima, aes(x=index, y = .mean, color = "ARIMA Model")) +
+  geom_ribbon(aes(x = idx, ymax = arima_hi, ymin = arima_lo, fill = "ARIMA Model"), alpha = 0.4, color = NA) +
+  geom_line(data = long_forecast_polynomial, aes(x=index, y = .mean, color = "Polynomial Model")) +
+  geom_ribbon(aes(x = long_forecast_polynomial$index, ymax = poly_hi, ymin = poly_lo, fill = "Polynomial Model"), alpha = 0.4, color = NA) +
+  geom_line(data = long_forecast_quadratic, aes(x=index, y = long_forecast_quadratic$.mean, color = "Quadratic Model")) +
+  geom_ribbon(aes(x = idx, ymax = quad_hi, ymin = quad_lo, fill = "Quadratic Model"), alpha = 0.4, color = NA) +
+  geom_line(data = long_forecast_linear, aes(x=index, y = Point.Forecast, color = "Linear Model"))  +
+  geom_ribbon(data = long_forecast_linear, aes(x=index, ymax = Hi.95, ymin = Lo.95, fill = "Linear Model"), alpha = 0.4, color = NA) + 
+  geom_hline(yintercept = 420) + 
+  geom_hline(yintercept = 500)
+plot
+```
+
+```{r}
+first_lin_lower <- long_forecast_linear[min(which(long_forecast_linear$Hi.95 > 420 & long_forecast_linear$Hi.95 < 421)), 'index']
+last_lin_lower <- long_forecast_linear[max(which(long_forecast_linear$Hi.95 > 420 & long_forecast_linear$Hi.95 < 421)), 'index']
+first_lin_point <- long_forecast_linear[min(which(long_forecast_linear$Point.Forecast > 420 & long_forecast_linear$Point.Forecast < 421)), 'index']
+last_lin_point <- long_forecast_linear[max(which(long_forecast_linear$Point.Forecast > 420 & long_forecast_linear$Point.Forecast < 421)), 'index']
+first_lin_upper <- long_forecast_linear[min(which(long_forecast_linear$Lo.95 > 420 & long_forecast_linear$Lo.95 < 421)), 'index']
+last_lin_upper <- long_forecast_linear[max(which(long_forecast_linear$Lo.95 > 420 & long_forecast_linear$Lo.95 < 421)), 'index']
+
+row_linear <- c(paste0(first_lin_point), paste('(', first_lin_lower, ',', first_lin_upper, ')'),
+                paste0(last_lin_point), paste('(', last_lin_lower, ',', last_lin_upper, ')'))
+
+first_quad_lower <- long_forecast_quadratic[[min(which(quad_hi > 420 & quad_hi < 421)), 'index']]
+last_quad_lower <- long_forecast_quadratic[[max(which(quad_hi > 420 & quad_hi < 421)), 'index']]
+first_quad_point <- long_forecast_quadratic[[min(which(long_forecast_quadratic$.mean > 420 & long_forecast_quadratic$.mean< 421)), 'index']]
+last_quad_point <- long_forecast_quadratic[[max(which(long_forecast_quadratic$.mean > 420 & long_forecast_quadratic$.mean< 421)), 'index']]
+first_quad_upper <- long_forecast_quadratic[[min(which(quad_lo > 420 & quad_lo < 421)), 'index']]
+last_quad_upper <- long_forecast_quadratic[[max(which(quad_lo > 420 & quad_lo < 421)), 'index']]
+
+
+row_quad <- c(paste0(first_quad_point), paste('(', first_quad_lower, ',', first_quad_upper, ')'),
+                paste0(last_quad_point), paste('(', last_quad_lower, ',', last_quad_upper, ')'))
+
+
+first_arima_lower <- long_forecast_arima[[min(which(arima_hi > 420 & arima_hi < 421)), 'index']]
+last_arima_lower <- long_forecast_arima[[max(which(arima_hi > 420 & arima_hi < 421)), 'index']]
+first_arima_point <- long_forecast_arima[[min(which(long_forecast_arima$.mean > 420 & long_forecast_arima$.mean< 421)), 'index']]
+last_arima_point <- long_forecast_arima[[max(which(long_forecast_arima$.mean > 420 & long_forecast_arima$.mean< 421)), 'index']]
+# lower bound never crosses 420
+# first_arima_upper <- long_forecast_arima[[min(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+# last_arima_upper <- long_forecast_arima[[max(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+
+row_arima <- c(paste0(first_arima_point), paste('(', first_arima_lower, ',', 'N/A', ')'),
+                paste0(last_arima_point), paste('(', last_arima_lower, ',', 'N/A', ')'))
+
+tab_420 <- rbind(row_linear, row_quad, row_arima)
+colnames(tab_420) = c('420: Predicted first time', 'first time 95% CI', '420: Predicted last last', 'last time 95% CI')
+rownames(tab_420) = c('Linear Model', 'Quadratic Model', 'ARIMA Model')
+tab_420
+
+```
+
+```{r}
+first_lin_lower <- long_forecast_linear[min(which(long_forecast_linear$Hi.95 >500 & long_forecast_linear$Hi.95 < 501)), 'index']
+last_lin_lower <- long_forecast_linear[max(which(long_forecast_linear$Hi.95 > 500 & long_forecast_linear$Hi.95 < 501)), 'index']
+first_lin_point <- long_forecast_linear[min(which(long_forecast_linear$Point.Forecast > 500 & long_forecast_linear$Point.Forecast < 501)), 'index']
+last_lin_point <- long_forecast_linear[max(which(long_forecast_linear$Point.Forecast > 500 & long_forecast_linear$Point.Forecast < 501)), 'index']
+first_lin_upper <- long_forecast_linear[min(which(long_forecast_linear$Lo.95 > 500 & long_forecast_linear$Lo.95 < 501)), 'index']
+last_lin_upper <- long_forecast_linear[max(which(long_forecast_linear$Lo.95 > 500 & long_forecast_linear$Lo.95 < 501)), 'index']
+
+row_linear <- c(paste0(first_lin_point), paste('(', first_lin_lower, ',', first_lin_upper, ')'),
+                paste0(last_lin_point), paste('(', last_lin_lower, ',', last_lin_upper, ')'))
+
+first_quad_lower <- long_forecast_quadratic[[min(which(quad_hi > 500 & quad_hi < 501)), 'index']]
+last_quad_lower <- long_forecast_quadratic[[max(which(quad_hi > 500 & quad_hi < 501)), 'index']]
+first_quad_point <- long_forecast_quadratic[[min(which(long_forecast_quadratic$.mean > 500 & long_forecast_quadratic$.mean< 501)), 'index']]
+last_quad_point <- long_forecast_quadratic[[max(which(long_forecast_quadratic$.mean > 500 & long_forecast_quadratic$.mean< 501)), 'index']]
+first_quad_upper <- long_forecast_quadratic[[min(which(quad_lo > 500 & quad_lo < 501)), 'index']]
+last_quad_upper <- long_forecast_quadratic[[max(which(quad_lo > 500 & quad_lo < 501)), 'index']]
+
+
+row_quad <- c(paste0(first_quad_point), paste('(', first_quad_lower, ',', first_quad_upper, ')'),
+                paste0(last_quad_point), paste('(', last_quad_lower, ',', last_quad_upper, ')'))
+
+
+first_arima_lower <- long_forecast_arima[[min(which(arima_hi > 500 & arima_hi < 501)), 'index']]
+last_arima_lower <- long_forecast_arima[[max(which(arima_hi > 500 & arima_hi < 501)), 'index']]
+first_arima_point <- long_forecast_arima[[min(which(long_forecast_arima$.mean > 500 & long_forecast_arima$.mean< 501)), 'index']]
+last_arima_point <- long_forecast_arima[[max(which(long_forecast_arima$.mean > 500 & long_forecast_arima$.mean< 501)), 'index']]
+# lower bound never crosses 420
+# first_arima_upper <- long_forecast_arima[[min(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+# last_arima_upper <- long_forecast_arima[[max(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+
+row_arima <- c(paste0(first_arima_point), paste('(', first_arima_lower, ',', 'N/A', ')'),
+                paste0(last_arima_point), paste('(', last_arima_lower, ',', 'N/A', ')'))
+
+tab_500 <- rbind(row_linear, row_quad, row_arima)
+colnames(tab_500) = c('500: Predicted first time', 'first time 95% CI', '500: Predicted last last', 'last time 95% CI')
+rownames(tab_500) = c('Linear Model', 'Quadratic Model', 'ARIMA Model')
+tab_500
+```
 
 
 # Report from the Point of View of the Present 
