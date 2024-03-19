@@ -24,7 +24,7 @@ library(gridExtra)
 library(readr)
 library(distributional)
 library(reshape2)
-library(impu)
+library(imputeTS)
 
 theme_set(theme_minimal())
 knitr::opts_chunk$set(dpi=1000)
@@ -142,6 +142,13 @@ plot2 <- df_co2 %>%
 
 grid.arrange(plot1, plot2, ncol = 2)
 ```
+```{r}
+AIC(linear_model)
+AIC(log_linear_model)
+
+BIC(linear_model)
+BIC(log_linear_model)
+```
 
 
 
@@ -199,7 +206,7 @@ poly_terms <- poly(co2, degree = 12)
 
 # adding seasonal dummy variable to code update 3/8
 # try different degrees??
-polynomial_model <- df_co2 %>% model(trend = TSLM(log(value) ~ trend() + I(trend()^2) + I(trend()^3) + season()))
+polynomial_model <- df_co2 %>% model(trend = TSLM(value ~ trend() + I(trend()^2) + I(trend()^3) + season()))
 
 residuals_poly <- residuals(polynomial_model)$.resid
 # resid3 <- plot(residuals_poly, type = 'l', main = "Residuals of Polynomial Model")
@@ -353,7 +360,7 @@ predict_int = function(row) {
   return(c(lo = mu - me, hi = mu + me))
 }
 
-predict_int(mu = unname(unlist(d_var))[1], sigma =unname(unlist(d_var))[2])
+# predict_int(mu = unname(unlist(d_var))[1], sigma =unname(unlist(d_var))[2])
 ```
 
 
@@ -376,9 +383,9 @@ arima_hi <- arima_ci[2, ]
 # polynomial forecast
 long_forecast_polynomial = forecast(polynomial_model, h = 1000)
 
-dist_param = parameters(long_forecast_polynomial$value)
+dist_param = parameters(long_forecast_polynomial$value) # change this line
 
-poly_ci <- apply(dist_param,1,  predict_int)
+poly_ci <- apply(data.frame(dist_param),1,  predict_int) # add data.frame() call
 
 poly_lo <- poly_ci[1, ]
 poly_hi <- poly_ci[2, ]
@@ -408,8 +415,8 @@ plot <- ggplot()  + geom_line(data = long_forecast_arima, aes(x=index, y = .mean
   geom_line(data = long_forecast_quadratic, aes(x=index, y = long_forecast_quadratic$.mean, color = "Quadratic Model")) +
   geom_ribbon(aes(x = idx, ymax = quad_hi, ymin = quad_lo, fill = "Quadratic Model"), alpha = 0.4, color = NA) +
   geom_line(data = long_forecast_linear, aes(x=index, y = Point.Forecast, color = "Linear Model"))  +
-  geom_ribbon(data = long_forecast_linear, aes(x=index, ymax = Hi.95, ymin = Lo.95, fill = "Linear Model"), alpha = 0.4, color = NA) + 
-  geom_hline(yintercept = 420) + 
+  geom_ribbon(data = long_forecast_linear, aes(x=index, ymax = Hi.95, ymin = Lo.95, fill = "Linear Model"), alpha = 0.4, color = NA) +
+  geom_hline(yintercept = 420) +
   geom_hline(yintercept = 500)
 plot
 ```
@@ -743,9 +750,8 @@ Seasonally adjust the weekly NOAA data, and split both seasonally-adjusted (SA) 
 ```{r}
 
 # Seasonally adjust the weekly NOAA data
-# Here, we'll use STL decomposition
 sa_noaa_data <- stl(x = ts(co2_present_mnth$value, frequency = 12), s.window = "periodic")
-co2_present_mnth$sa_co2_level <- sa_noaa_data$time.series[, "seasonal"]
+co2_present_mnth$sa_co2_level <- sa_noaa_data$time.series[, "trend"]
 
 # Split data into training and test sets
 # Use the last two years (104 weeks) as the test set
@@ -773,8 +779,8 @@ values_ns_forecast <- ns_forecast$value[is.numeric(ns_forecast$value)]
 values_sa_forecast <- sa_forecast$value[is.numeric(sa_forecast$value)]
 
 
-ns_pseudo_out_sample <- values_ns_forecast - sa_test$value
-sa_pseudo_out_sample <- values_sa_forecast - sa_test$value
+ns_pseudo_out_sample <- ns_forecast$mean - sa_test$value
+sa_pseudo_out_sample <- sa_forecast$mean - sa_test$value
 
 # # Fit polynomial time-trend model to SA series
 poly_trend <- sa_train %>% model(trend = TSLM(value ~ trend() + I(trend()^2) + I(trend()^3) + season()))
@@ -798,13 +804,20 @@ print(poly_rmse)
 
 residuals_ns <- residuals(arima_ns)
 
-# Plot the residuals
+# Plot the residuals ns
 plot(residuals_ns, xlab = "Time", ylab = "Residuals", main = "Residuals Plot")
 
 residuals_sa <- residuals(arima_sa)
 
-# Plot the residuals
+# Plot the residuals sa
 plot(residuals_sa, xlab = "Time", ylab = "Residuals", main = "Residuals Plot")
+
+#out sample
+# Plot the residuals sa out 
+ns_pseudo_out_sample
+plot(ns_pseudo_out_sample, xlab = "Time", ylab = "Forecasted - Actual", main = "Pseudo/Out Plot NS")
+#Plot the residuals ns out
+plot(sa_pseudo_out_sample, xlab = "Time", ylab = "Forecasted - Actual", main = "Pseudo/Out Plot SA")
 
 
 autoplot(ns_forecast)
@@ -826,7 +839,9 @@ sa_poly_forecast
 
 ```{r}
 
-dist_param = parameters(long_forecast_arima$value)
+long_forecast_arima <- forecast(arima_ns, h = 4000)
+long_forecast_arima
+dist_param = parameters(long_forecast_arima$me)
 
 arima_ci <- apply(data.frame(dist_param),1,  predict_int)
 
@@ -977,3 +992,5 @@ colnames(tab_500) = c('500: Predicted first time', 'first time 95% CI', '500: Pr
 rownames(tab_500) = c('ARIMA Model')
 tab_500
 ```
+
+
