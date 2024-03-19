@@ -137,7 +137,9 @@ The EDA suggests we will need to consider a linear trend along with seasonal var
 
 ##Models
 
-  We test a series of models to determine the best 
+  We test a series of models to determine the best model to explain carbon dioxide levels and accumulation path at Mauna Loa. The general formulation of the models follows a linear time trend (equation 1), quadratic transformation (equation 2), and polynomial time series model (equation 3). 
+  
+  
 ## Linear time trend model
 
 Fit a linear time trend model to the `co2` series, and examine the characteristics of the residuals. Compare this to a quadratic time trend model. Discuss whether a logarithmic transformation of the data would be appropriate. Fit a polynomial time trend model that incorporates seasonal dummy variables, and use this model to generate forecasts to the year 2020. 
