@@ -1,0 +1,1161 @@
+---
+subtitle: "Manoa CO2 Levels"
+author: "Hannah Abraham, Annie DeForge, Mariah Ehmke, Nora Povejsil"
+output: bookdown::pdf_document2
+fontsize: 10pt
+geometry: margin=0.5in
+---
+
+# The Keeling Curve
+
+```{r, echo=FALSE}
+# install.packages('blsR')
+# install.packages('psych')
+# install.packages('imputeTS')
+# install.packages('forecast')
+```
+
+```{r load packages, echo = FALSE, message = FALSE, warning=FALSE}
+library(tidyverse)
+library(patchwork)
+library(tsibble)
+library(latex2exp)
+library(lubridate)
+
+library(tinytex)
+library(blsR)
+library(psych)
+library(feasts)
+library(forecast)
+library(fable)
+library(gridExtra)
+library(readr)
+library(distributional)
+library(reshape2)
+library(imputeTS)
+
+theme_set(theme_minimal())
+knitr::opts_chunk$set(dpi=1000)
+```
+
+\newpage
+
+
+
+## Introduction 
+
+The most recent UN Climate Conference known as COP28, resulted in international call to limit greenhouse gas emissions to limit overall planetary global warming to 1.5 degrees Celsius. The plans rely on reducing greenhouse gas emissions from anthropogenic activities and increasing the uptake of carbon dioxide (CO2) from the atmosphere into natural storage systems, such as forests and soils (United Nations Climate Conference, 2023). Global levels of CO2 have more than doubled around the world compared to pre-industrialization levels (Jiménez-de-la-Cuesta and Mauritsen, 2019). This doubling has occurred despite seasonal growth and contractions in CO2 levels, particularly in areas with forests. 
+
+Seasonal variation in CO2 levels reflects the terrestrial cycles related to plant growth and decomposition. Keeling (1960) showed atmospheric local seasonal CO2 levels in Mauna Loa, Hawaii peaked right before a new growing season, steadily decreased as plants absorbed CO2 during the growing season, and reached a low at the end of the growing season. Despite these seasonal adjustments, baseline CO2 levels in Hawaii and throughout the world have grown over time. The growth reflects increased emissions from industrial, agricultural, and transportation systems. The goal of the COP28 is to contain CO2 levels through improved forestry and biodiversity management to absorb more CO2 from the atmosphere. 
+
+The objective of this analysis is to measure the trend in atmospheric CO2 levels in Mauna Loa, Hawaii, controlling for seasonal fluctuations. We test the following null hypotheses: 
+
+H01: Atmospheric CO2 concentrations at Mauna Loa, Hawaii follow a linear trend from 1957 to 2020. 
+HA1: Atmospheric CO2 concentrations at Mauna Loa, Hawaii follow a non-linear trend from 1957 to 2020.
+
+If the null hypothesis holds, it will provide insight into the rate at which atmospheric CO2 levels would decrease given reductions in CO2 emissions from industrial, agricultural, and transportation technologies. If it the trend is linear, we would expect a proportional decrease in CO2 levels from emission reductions following a reverse linear trend. If it is not linear, then CO2 levels will respond differently to emission caps. We will explore possible growth paths if the null hypothesis is rejected. 
+
+
+## CO2 data
+
+The data were collected at the Mauna Loa, Hawaii Observatory near the Mauna Loa Volcano in Hawaii. The amount of $CO_{2}$ is reported as the 'mole fraction' or number of carbon dioxide molecules present in a given number of molecules of air (National Oceanic and Atmospheric Administration, 2023). A $CO_{2}$ level of 400 indicates there are 400 parts per million (ppm) $CO_{2}$ molecules in every million molecules of dry air. The data collection began in 1957 by Dave Keeling (Keeling, 1960). The data are continuosly collected. We present data in part a that were monthly averages of $CO_{2}$ levels from 1957 to 1997. In part b, we extend our analysis using weekly averaged data from 1997 to the present.  
+
+
+```{r load data into tsibble, echo = F}
+df_co2 <- as_tsibble(co2)
+```
+
+### Exploratory Data Analysis 
+
+The exploratory data analysis includes a linear plot of the raw data and the trend-cycle components, and the additive components of the time series (i.e., trend, seasonality, and the remainder). According to Keeling (YEAR), the data follow a seasonal, cyclical pattern. Each year, CO2 levels are lowest at the end of the growing season following plant growth and CO2 absorption. Then, the CO2 levels peak at the start of the growing season, before plants have begun absorbing excess CO2 from the atmosphere. The raw data follow this pattern, but with an upward trend, illustrated by the purple line in Figure 1. 
+
+We employ seasonal, trend, and remainder (STL) decomposition to parse out the role of seasonality, trends in the average across time, and remainder components on the time series in the four plots on the right-hand side of Figure 1. The trend is semi-linear and upward sloping. The yearly average is increasing over time. The seasonal variation appears to expand across time as the height and, especially the depth, of the seasonal line plot increases after the mid-1970s. The bottom right-hand line plot of remainder variation does not have a discernible visual pattern. 
+
+```{r, echo = F}
+# seasonal decomposition
+dcmp <- df_co2 %>% 
+  model(stl = STL(value))
+co2_dcmp_components <- components(dcmp) 
+```
+
+```{r, echo = F, fig.height=2.5, fig.width=6} 
+
+components_trend_cycle<-co2_dcmp_components%>%
+  as_tsibble() %>% 
+  autoplot(value, colour = 'gray')  +
+  geom_line(aes(y=trend), color = 'purple') +
+  labs(
+    y = "CO2 Level (ppm)",
+    title = "CO2 Levels in Mauna Loa, Hawaii"
+  )
+
+co2_separate_components <-components(dcmp) %>% autoplot()
+#| fig.cap = 'Figure 1 - Terrestrial carbon dioxide levels and time series decomposition'
+grid.arrange(components_trend_cycle, co2_separate_components, ncol = 2)
+```
+To analyze the trend year-by-year, Figure 2 provides another angle to view the upward trend in CO2 levels at Mauna Loa. The monthly CO2 (ppm) level was close to 315 ppm in 1959 and increased to upward of 365 ppm at the end of 1997. This is approximately a 16 percent increase in the concentration of CO2 at Mauna Loa across the nearly forty years of observations. 
+
+```{r, echo = F, fig.height=1.5, fig.width=3}
+#Seasonal Plot 
+# |fig.cap = 'Figure 2. Line plots of annual carbon dioxide levels from 1957 to 1997'
+eda1 <- df_co2 %>% 
+  gg_season(value, labels="both") + 
+  labs(y= "CO2 (ppm)",
+       title = "Seasonal Plot: CO2 Levels in Mauna Observatory, Hawaii",
+       x = "Month")
+ 
+```
+A break-down of the overall trend into time-trends in CO2 levels per month is presented in Figure 3. One will note CO2 levels appear to be lowest, on average in September and October and peak in May. This reflects the growing season patterns discussed by Keeling (1960). Although Keeling had fewer data points to consider, his observation transcends time. What is not clear is whether the upward trend in average CO2 levels is constant or increasing at a faster pace than in Keelings day. The trend line in Figure one appears to present as slightly convex or increasing at an increasing rate, especially after 1990. Also, the distance between lines in Figure 2 appears to increase in the 1990s as there is more white space between lines than previous decades, in particular when compared to the 1950s and 1960s. 
+
+```{r, echo = F, fig.height=2, fig.width=7}
+#Seasonal Subseries plot 
+#| fig.cap = 'Figure 3 - The seasonal subseries of carbon dioxide levels in Mauna Loa'
+eda2 <- df_co2 %>% gg_subseries(value) + 
+  labs(
+    y = "CO2 (ppm)",
+    title = "Seasonal Subseries Plots of CO2 Levels at Mauna Loa Observatory, Hawaii"
+  )
+eda1 | eda2
+```
+Thus far, the data visualizations suggest a non-stationary process with strong seasonal trends. We now turn to lag and ACF plots to gauge possible auto-regressive tendencies in the data. We see strong correlation among the lag values in the lag-lag plot on the left-hand side of Figure 4. The first three month lags are nearly perfectly correlated with the time t $CO_{2}$ levels. From lags four to seven, there is more dispersion in lag correlates, but the linear, positive correlation remains strong. Finally, lags eight and nine realign with time t. The ACF supports a seasonal non-stationarity. Lags decrease at a slow, but cyclical rate.
+
+```{r, echo = F, fig.height=2.5, fig.width=6}
+#Lab Plots 
+#| fig.cap  = 'Figure 4 - Lag and ACF plots of carbon dioxide levels at Mauna Loa Observatory'
+CO2_lags <- df_co2 %>% 
+  gg_lag(value, geom = 'point') + 
+  labs(x = "lag(value,k)", 
+       title = "Lag Plots for CO2 (ppm)") +
+  scale_y_discrete(guide = guide_axis(check.overlap = TRUE)) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
+
+
+CO2_ACF <- df_co2 %>% 
+  ACF(value) %>% 
+  autoplot() + labs(title = "The ACF for CO2 (ppm) at Muana Loa Observatory")
+
+grid.arrange(CO2_lags, CO2_ACF, ncol = 2)  
+# add histogram maybe?--Not enough room. Really doesn't tell us much about the time series
+```
+The EDA suggests we will need to consider a linear trend along with seasonal variation in the models of the carbon dioxide levels over time. Next, we build time-series models of carbon dioxide fluctuations to break down the seasonal variation and time trend to forecast future $CO_{2}$ accumulation at Mauna Loa. 
+
+##Models
+
+  We test a series of models to determine the best model to explain carbon dioxide levels and accumulation path at Mauna Loa. The general formulation of the models follows a linear time trend (equation 1), quadratic transformation (equation 2), and polynomial time series model (equation 3). 
+  
+  
+## Linear time trend model
+
+Fit a linear time trend model to the `co2` series, and examine the characteristics of the residuals. Compare this to a quadratic time trend model. Discuss whether a logarithmic transformation of the data would be appropriate. Fit a polynomial time trend model that incorporates seasonal dummy variables, and use this model to generate forecasts to the year 2020. 
+
+$y_{t} = \beta_{0} + \beta_{1}t +\epsilon_{t}$ \t (Equation 1) \
+$y_{t} = \beta_{0} + \beta_{1}t + \beta_{2}t^{2} + \epsilon_{t}$ \t (Equation 2) \
+$y_{t} = \beta_{0} + \beta_{1}t + \beta_{2}t^{2} + \beta_{3}t^{3} + \epsilon_{t}$ \t \
+
+where $y_{t}$ is the level of carbon dioxide in time $t$ and $\epsilon_{t}$ is the white noise associated with the series. 
+
+```{r, echo = F, fig.height=1.5, fig.width=7}
+#### 2A NORA WORK FROM 3/5
+
+# Fit a linear time trend model
+linear_model <- tslm(co2 ~ trend)
+
+# Examine characteristics of residuals
+residuals_linear <- residuals(linear_model)
+# resid1 <- plot(residuals_linear, type = "l", main = "Residuals of Linear Model")
+
+#plot of linear model
+lin_plot <- df_co2 %>%
+  ggplot() + geom_point(aes(x= index, y = value))  + 
+  geom_line(aes(x = index, y=linear_model$fitted), color = 'blue') + 
+  labs(title = "Fitted Linear Model",
+       x = 'time',
+       y = 'CO2 (ppm)')
+
+#comment out log-linear model
+# add log linear model
+# log_linear_model <- tslm(log(co2) ~ time(co2))
+# 
+# # Examine characteristics of residuals
+# residuals_log_lin <- residuals(log_linear_model)
+# # plot(residuals_log_lin, type = "l", main = "Residuals of Linear Model")
+
+
+# Fit a quadratic time trend model
+quadratic_model <- df_co2 %>% model(trend = TSLM(value ~ trend() + I(trend()^2)))
+
+# Examine characteristics of residuals
+residuals_quadratic <- residuals(quadratic_model)$.resid
+# resid2 <- plot(residuals_quadratic, type = "l", main = "Residuals of Quadratic Model")
+
+#plot of quadratic model
+quad_plot <- df_co2 %>%
+  ggplot() + geom_point(aes(x= index, y = value))  + 
+  geom_line(aes(x = index, y=fitted(quadratic_model)$.fitted), color = 'blue') + 
+  labs(title = "Fitted Quadratic Model",
+       x = 'time',
+       y = 'CO2 (ppm)')
+
+# Test for logarithmic transformation
+# log_model <- lm(log(co2) ~ time(co2))
+# summary(log_model)
+
+
+# Fit a polynomial time trend model with seasonal dummies
+
+    
+poly_terms <- poly(co2, degree = 12)
+
+# adding seasonal dummy variable to code update 3/8
+# try different degrees??
+polynomial_model <- df_co2 %>% model(trend = TSLM(log(value) ~ trend() + I(trend()^2) + I(trend()^3) + season()))
+
+residuals_poly <- residuals(polynomial_model)$.resid
+# resid3 <- plot(residuals_poly, type = 'l', main = "Residuals of Polynomial Model")
+
+# plot of polynomial model 
+poly_plot <- df_co2 %>%
+  ggplot() + geom_point(aes(x= index, y = value))  + 
+  geom_line(aes(x = index, y=fitted(polynomial_model)$.fitted), color = 'blue') + 
+  labs(title = "Fitted Polynomial Model",
+       x = 'time',
+       y = 'CO2 (ppm)') + 
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
+
+grid.arrange(lin_plot, quad_plot, poly_plot, ncol = 3)
+
+
+# grid.arrange(resid1, resid2, ncol=2)
+# Generate forecasts to the year 2020
+forecast_polynomial <- forecast(polynomial_model, h = 276)
+# forecast_polynomial %>% ggplot(aes(x = index, y=.mean)) + geom_line()
+```
+```{r, echo=F, fig.height=3, fig.width=6}
+par(mfrow=c(2,3))  
+plot(residuals_linear, main = "Residuals of Linear Model")
+plot(residuals_quadratic, type = "l", main = "Residuals of Quadratic Model")
+plot(residuals_poly,type = "l", main = "Residuals of Polynomial Model")
+acf(residuals_linear)
+acf(residuals_quadratic)
+acf(residuals_poly)
+```
+
+```{r}
+mod_names <- c("linear", "quadratic", "polynomial")
+mod_aic <- c(AIC(linear_model),  glance(quadratic_model)$AIC, glance(polynomial_model)$AIC)
+mod_bic <- c(BIC(linear_model),  glance(quadratic_model)$BIC, glance(polynomial_model)$BIC)
+
+mod_table <- cbind(mod_names, mod_aic, mod_bic)
+mod_table
+```
+<<<<<<< HEAD
+
+
+=======
+The AIC and BIC measurements form the three fitted models indicate the polynomial model has the best fit or makes the best use of the parameters because it has both the lowest AIC and BIC.The plot of the polynomial model results are in the right-side panel of the three panel diagram above. The residual plots below indicate the residuals from the polynomial plot are distributed more precisely around zero. The ACF of residuals dis not stationary, but not the seasonal variation of the linear and quadratic models. \
+```{r, fig.height=3, fig.width=6}
+par(mfrow=c(2,3))  
+plot(residuals_linear, main = "Residuals of Linear Model")
+plot(residuals_quadratic, main = "Residuals of Quadratic Model")
+plot(residuals_poly, main = "Residuals of Polynomial Model")
+acf(residuals_linear)
+acf(residuals_quadratic)
+acf(residuals_poly)
+```
+Finally, the forecast below is estimaed using the polynomial model. The $CO_{2}$ are expected to surpass 380 ppm after 2020. 
+>>>>>>> 3ef1e3f (part a write up additions)
+
+```{r, echo = F, message=FALSE, fig.height=1.5, fig.width=3}
+# use polynomial model to forecast to 2020
+par(mfrow=c(1,4)) 
+forecast_polynomial %>%
+autoplot(colour="cornflowerblue") +
+autolayer(df_co2, colour="black") +
+geom_line(data=polynomial_model %>% augment(), aes(index,.fitted,color=.model))
+```
+
+### Log-Linear Model consideration
+The $CO_{2}$ level data display a linear trend with equal variance. From the plot below, you can see that a log transformation does not significantly alter the data structure. Therefore, there does not appear to be benefits from a logarithmic transformation of the data. 
+
+```{r, echo = F, fig.height=1.5, fig.width=3}
+# plot showing log transformation
+plot1 <- df_co2 %>%
+  ggplot() + geom_point(aes(x= index, y = value)) +
+  labs(title = "Untransformed Data")
+plot2 <- df_co2 %>%
+  ggplot() + geom_point(aes(x= index, y = log(value))) +
+  labs(title = "Log Transformation Data")
+
+grid.arrange(plot1, plot2, ncol = 2)
+```
+## ARIMA times series model 
+ We use a series of time series, ACF, PACF, and histogram plots to investigate the possible suitability of an ARIMA model for the data. The upward trend in the seasonally variable data suggest a moving average process. Further, the ACF illustrates strong non-stationarity.
+
+```{r, echo = F, fig.height=1.5, fig.width=6}
+# 4 core plots
+par(mfrow=c(1,3)) 
+plot(df_co2$value, xlab="Period",
+     ylab="CO2 (ppm)", main="Time Series")
+acf(df_co2$value, main = "ACF")
+pacf(df_co2$value, main = "PACF")
+#hist(df_co2$value, main = "Histogram", xlab = "CO2 (ppm)") #The histogram doesn't add to our explanation.
+```
+
+*Core plot write up*
+The time series plot shows an increasing average as time increases. The histogram of Co2 values also shows an non-normal distribution. Both of these point to an increasing trend in the data. The ACF plot shows persistent significant lags, even for very large lag values, this is an attribute of an AR process. Additionally, the PACF plot quickly dies, but maintain an oscillating pattern, which is an attribute of an MA process. All of these factors together point towards an ARIMA process that underlies the Co2 time series that we wish to model.
+
+```{r model selection, echo = F}
+# selection with AIC
+# model selection with AIC
+model.aic<- df_co2 %>%
+  model(ARIMA(value ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0,0,0),
+              ic="aic", stepwise=F, greedy=F))
+
+# model.aic %>%
+#   report()
+
+# selection with AIcc
+model.aicc<- df_co2 %>%
+  model(ARIMA(value ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0,0,0),
+              ic="aicc", stepwise=F, greedy=F))
+
+# model.aicc %>%
+#   report()
+
+# selection with BIC
+model.bic<- df_co2 %>%
+  model(ARIMA(value ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0,0,0),
+              ic="bic", stepwise=F, greedy=F))
+
+model.bic %>%
+  report()
+
+```
+
+
+*Model Interpretation*
+Model selection across AIC, AICc, and BIC all chose an ARIMA model with 2 AR parameters, 4 MA parameters and linear differencing. However, from looking at the ACF and PACF plots, below there is signs that there are still unaccounted seasonality trends that could be incorporated into the model.
+
+```{r, echo = F, fig.height=1.5, fig.width=5}
+# testing performance of ARIMA(2, 1, 4)
+
+#plots
+par(mfrow=c(1,3)) 
+plot(resid(model.aic)$.resid, main = "Residual plot")
+acf(resid(model.aic)$.resid, main = "ACF")
+pacf(resid(model.aic)$.resid, main = "PACF")
+```
+
+```{r, echo = F}
+sar_aic <- df_co2 %>% 
+  model(ARIMA(value, ic = 'aic')) 
+report (sar_aic)
+
+sar_bic <- df_co2 %>% 
+  model(ARIMA(value, ic = 'bic')) 
+report (sar_bic)
+```
+
+
+```{r, echo = F, fig.height=1.5, fig.width=5}
+# testing performance of SARIMA
+
+#plots
+par(mfrow=c(1,3)) 
+plot(resid(sar_bic)$.resid, main = "Residual plot")
+acf(resid(sar_bic)$.resid, main = "ACF")
+pacf(resid(sar_bic)$.resid, main = "PACF")
+```
+
+
+
+
+```{r, echo = F, fig.height=1.5, fig.width=3, message=FALSE}
+# forecast to the 2022
+forecast_arima <- forecast(sar_bic, h = 300)
+forecast_arima %>%
+autoplot(colour="cornflowerblue") +
+autolayer(df_co2, colour="black") +
+geom_line(data=sar_bic %>% augment(), aes(index,.fitted,color=.model))
+```
+
+
+
+## (3 points) Task 4a: Forecast atmospheric CO2 growth 
+
+Generate predictions for when atmospheric CO2 is expected to be at [420 ppm](https://research.noaa.gov/article/ArtMID/587/ArticleID/2764/Coronavirus-response-barely-slows-rising-carbon-dioxide) and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2100. How confident are you that these will be accurate predictions?
+
+```{r, echo = F}
+# add prediction intervals
+# long_forecast_arima = forecast(sar_bic, h = 700)
+# long_forecast_arima[min(which(long_forecast_arima$.mean > 420)), 'index'] # first time larger than 420
+
+predict_int = function(row) {
+  mu = row[1]
+  sigma = row[2]
+  me <- qnorm(0.975)*sigma
+  return(c(lo = mu - me, hi = mu + me))
+}
+
+# predict_int(mu = unname(unlist(d_var))[1], sigma =unname(unlist(d_var))[2])
+```
+
+
+```{r, echo = F}
+# arima forecast
+long_forecast_arima = forecast(sar_bic, h = 1500)
+
+# dist_param = data.frame(cbind(names(unlist(long_forecast_arima$value)), unname(unlist(long_forecast_arima$value))))
+# 
+# mu <- as.integer(dist_param$X2[(dist_param$X1 == "mu")])
+# sigma <- as.numeric(dist_param$X2[(dist_param$X1 == "sigma")])
+
+dist_param = parameters(long_forecast_arima$value)
+
+arima_ci <- apply(data.frame(dist_param),1,  predict_int)
+
+arima_lo <- arima_ci[1, ]
+arima_hi <- arima_ci[2, ]
+
+# polynomial forecast
+long_forecast_polynomial = forecast(polynomial_model, h = 1000)
+dist_param = parameters(parameters((long_forecast_polynomial$value))$dist) #this line is particular is changed
+poly_ci <- apply(data.frame(dist_param),1,  predict_int) # add data.frame() call
+poly_lo <- poly_ci[1, ]
+poly_hi <- poly_ci[2, ]
+
+# quadratic forecast
+long_forecast_quadratic = forecast(quadratic_model, h = 1500)
+
+dist_param = parameters(long_forecast_quadratic$value)
+
+quad_ci <- apply(dist_param,1,  predict_int)
+
+quad_lo <- quad_ci[1, ]
+quad_hi <- quad_ci[2, ]
+
+# linear forecast
+long_forecast_linear = data.frame(forecast(linear_model, h = 1500))
+long_forecast_linear$index = yearmonth(row.names(long_forecast_linear))
+```
+
+
+```{r, echo = F, fig.height=2.5, fig.width=3}
+idx = long_forecast_arima$index
+plot <- ggplot()  + geom_line(data = long_forecast_arima, aes(x=index, y = .mean, color = "ARIMA Model")) +
+  geom_ribbon(aes(x = idx, ymax = arima_hi, ymin = arima_lo, fill = "ARIMA Model"), alpha = 0.4, color = NA) +
+  geom_line(data = long_forecast_polynomial, aes(x=index, y = .mean, color = "Polynomial Model")) +
+  geom_ribbon(aes(x = long_forecast_polynomial$index, ymax = poly_hi, ymin = poly_lo, fill = "Polynomial Model"), alpha = 0.4, color = NA) +
+  geom_line(data = long_forecast_quadratic, aes(x=index, y = long_forecast_quadratic$.mean, color = "Quadratic Model")) +
+  geom_ribbon(aes(x = idx, ymax = quad_hi, ymin = quad_lo, fill = "Quadratic Model"), alpha = 0.4, color = NA) +
+  geom_line(data = long_forecast_linear, aes(x=index, y = Point.Forecast, color = "Linear Model"))  +
+  geom_ribbon(data = long_forecast_linear, aes(x=index, ymax = Hi.95, ymin = Lo.95, fill = "Linear Model"), alpha = 0.4, color = NA) + 
+  geom_hline(yintercept = 420) + 
+  geom_hline(yintercept = 500)
+plot
+```
+
+```{r, echo = F}
+first_lin_lower <- long_forecast_linear[min(which(long_forecast_linear$Hi.95 > 420 & long_forecast_linear$Hi.95 < 421)), 'index']
+last_lin_lower <- long_forecast_linear[max(which(long_forecast_linear$Hi.95 > 420 & long_forecast_linear$Hi.95 < 421)), 'index']
+first_lin_point <- long_forecast_linear[min(which(long_forecast_linear$Point.Forecast > 420 & long_forecast_linear$Point.Forecast < 421)), 'index']
+last_lin_point <- long_forecast_linear[max(which(long_forecast_linear$Point.Forecast > 420 & long_forecast_linear$Point.Forecast < 421)), 'index']
+first_lin_upper <- long_forecast_linear[min(which(long_forecast_linear$Lo.95 > 420 & long_forecast_linear$Lo.95 < 421)), 'index']
+last_lin_upper <- long_forecast_linear[max(which(long_forecast_linear$Lo.95 > 420 & long_forecast_linear$Lo.95 < 421)), 'index']
+
+row_linear <- c(paste0(first_lin_point), paste('(', first_lin_lower, ',', first_lin_upper, ')'),
+                paste0(last_lin_point), paste('(', last_lin_lower, ',', last_lin_upper, ')'))
+
+first_quad_lower <- long_forecast_quadratic[[min(which(quad_hi > 420 & quad_hi < 421)), 'index']]
+last_quad_lower <- long_forecast_quadratic[[max(which(quad_hi > 420 & quad_hi < 421)), 'index']]
+first_quad_point <- long_forecast_quadratic[[min(which(long_forecast_quadratic$.mean > 420 & long_forecast_quadratic$.mean< 421)), 'index']]
+last_quad_point <- long_forecast_quadratic[[max(which(long_forecast_quadratic$.mean > 420 & long_forecast_quadratic$.mean< 421)), 'index']]
+first_quad_upper <- long_forecast_quadratic[[min(which(quad_lo > 420 & quad_lo < 421)), 'index']]
+last_quad_upper <- long_forecast_quadratic[[max(which(quad_lo > 420 & quad_lo < 421)), 'index']]
+
+
+row_quad <- c(paste0(first_quad_point), paste('(', first_quad_lower, ',', first_quad_upper, ')'),
+                paste0(last_quad_point), paste('(', last_quad_lower, ',', last_quad_upper, ')'))
+
+
+first_arima_lower <- long_forecast_arima[[min(which(arima_hi > 420 & arima_hi < 421)), 'index']]
+last_arima_lower <- long_forecast_arima[[max(which(arima_hi > 420 & arima_hi < 421)), 'index']]
+first_arima_point <- long_forecast_arima[[min(which(long_forecast_arima$.mean > 420 & long_forecast_arima$.mean< 421)), 'index']]
+last_arima_point <- long_forecast_arima[[max(which(long_forecast_arima$.mean > 420 & long_forecast_arima$.mean< 421)), 'index']]
+# lower bound never crosses 420
+# first_arima_upper <- long_forecast_arima[[min(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+# last_arima_upper <- long_forecast_arima[[max(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+
+row_arima <- c(paste0(first_arima_point), paste('(', first_arima_lower, ',', 'N/A', ')'),
+                paste0(last_arima_point), paste('(', last_arima_lower, ',', 'N/A', ')'))
+
+tab_420 <- rbind(row_linear, row_quad, row_arima)
+colnames(tab_420) = c('420: Predicted first time', 'first time 95% CI', '420: Predicted last last', 'last time 95% CI')
+rownames(tab_420) = c('Linear Model', 'Quadratic Model', 'ARIMA Model')
+tab_420
+
+```
+
+```{r, echo = F}
+first_lin_lower <- long_forecast_linear[min(which(long_forecast_linear$Hi.95 >500 & long_forecast_linear$Hi.95 < 501)), 'index']
+last_lin_lower <- long_forecast_linear[max(which(long_forecast_linear$Hi.95 > 500 & long_forecast_linear$Hi.95 < 501)), 'index']
+first_lin_point <- long_forecast_linear[min(which(long_forecast_linear$Point.Forecast > 500 & long_forecast_linear$Point.Forecast < 501)), 'index']
+last_lin_point <- long_forecast_linear[max(which(long_forecast_linear$Point.Forecast > 500 & long_forecast_linear$Point.Forecast < 501)), 'index']
+first_lin_upper <- long_forecast_linear[min(which(long_forecast_linear$Lo.95 > 500 & long_forecast_linear$Lo.95 < 501)), 'index']
+last_lin_upper <- long_forecast_linear[max(which(long_forecast_linear$Lo.95 > 500 & long_forecast_linear$Lo.95 < 501)), 'index']
+
+row_linear <- c(paste0(first_lin_point), paste('(', first_lin_lower, ',', first_lin_upper, ')'),
+                paste0(last_lin_point), paste('(', last_lin_lower, ',', last_lin_upper, ')'))
+
+first_quad_lower <- long_forecast_quadratic[[min(which(quad_hi > 500 & quad_hi < 501)), 'index']]
+last_quad_lower <- long_forecast_quadratic[[max(which(quad_hi > 500 & quad_hi < 501)), 'index']]
+first_quad_point <- long_forecast_quadratic[[min(which(long_forecast_quadratic$.mean > 500 & long_forecast_quadratic$.mean< 501)), 'index']]
+last_quad_point <- long_forecast_quadratic[[max(which(long_forecast_quadratic$.mean > 500 & long_forecast_quadratic$.mean< 501)), 'index']]
+first_quad_upper <- long_forecast_quadratic[[min(which(quad_lo > 500 & quad_lo < 501)), 'index']]
+last_quad_upper <- long_forecast_quadratic[[max(which(quad_lo > 500 & quad_lo < 501)), 'index']]
+
+
+row_quad <- c(paste0(first_quad_point), paste('(', first_quad_lower, ',', first_quad_upper, ')'),
+                paste0(last_quad_point), paste('(', last_quad_lower, ',', last_quad_upper, ')'))
+
+
+first_arima_lower <- long_forecast_arima[[min(which(arima_hi > 500 & arima_hi < 501)), 'index']]
+last_arima_lower <- long_forecast_arima[[max(which(arima_hi > 500 & arima_hi < 501)), 'index']]
+first_arima_point <- long_forecast_arima[[min(which(long_forecast_arima$.mean > 500 & long_forecast_arima$.mean< 501)), 'index']]
+last_arima_point <- long_forecast_arima[[max(which(long_forecast_arima$.mean > 500 & long_forecast_arima$.mean< 501)), 'index']]
+# lower bound never crosses 420
+# first_arima_upper <- long_forecast_arima[[min(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+# last_arima_upper <- long_forecast_arima[[max(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+
+row_arima <- c(paste0(first_arima_point), paste('(', first_arima_lower, ',', 'N/A', ')'),
+                paste0(last_arima_point), paste('(', last_arima_lower, ',', 'N/A', ')'))
+
+tab_500 <- rbind(row_linear, row_quad, row_arima)
+colnames(tab_500) = c('500: Predicted first time', '95% CI', '500: Predicted last time', '95% CI')
+rownames(tab_500) = c('Linear Model', 'Quadratic Model', 'ARIMA Model')
+tab_500
+```
+
+```{r}
+# 2100 - 1998 = 102*12 + 1 = 1224 + 1 = 1225
+forecast_2100 = forecast(sar_bic, h = 1225)
+predict_2100 <- tail(forecast_2100, n=1)
+point_2100 <- predict_2100$.mean
+
+dist_param = parameters(predict_2100$value)
+ci_2100 <- apply(data.frame(dist_param),1,  predict_int)
+lo_2100 <- ci_2100[1]
+hi_2100 <- ci_2100[2]
+
+paste("Point Estimate: ", round(point_2100, 2))
+paste("95% CI: (", round(lo_2100, 2), ',', round(hi_2100, 2), ')')
+```
+
+# Report from the Point of View of the Present 
+
+## (1 point) Task 0b: Introduction 
+
+
+## (3 points) Task 1b: Create a modern data pipeline for Mona Loa CO2 data.
+
+```{r, echo = F, message=FALSE}
+# download and use the CSV
+
+# weekly data url
+# weekly_url <- 'https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_weekly_mlo.txt'
+# # download file into weekly csv
+# download.file(weekly_url, "weekly.csv")
+# create headings
+headings = c("year", "month", "day", "decimal", "average", "ndays", "1_yr_ago", "10_yrs_ago", "increase_since_1800")
+# read into and format dataframe
+new_co2_w<- read.table("weekly.csv", header=FALSE, quote="\"", stringsAsFactors=TRUE)
+colnames(new_co2_w) <- headings
+
+co2_present <- new_co2_w %>%
+  mutate(time_index = as.Date(make_datetime(year, month, day))) %>% as_tsibble(index = time_index)
+
+
+# head(co2_present)
+```
+
+```{r, echo = F}
+# clean data replace -999.99 with NA
+co2_present[co2_present == -999.99] = NA
+```
+
+
+```{r, echo = F, fig.height=1.75, fig.width=1.75}
+co2_present %>%
+  ggplot() + 
+  aes(x=time_index, y=average) + 
+  geom_line(color = 'steelblue') +
+  labs(
+    title = TeX(r'(Weekly Mean $CO_2$)'),
+    subtitle = 'The "Keeling Curve"',
+    x = 'Week and Year',
+    y = TeX(r'($CO_2$ parts per million)')
+  )
+```
+
+```{r, echo = F}
+# create monthly present data
+co2_present_mnth <- co2_present %>% 
+  index_by(mnth = yearmonth(as.POSIXlt(time_index, format="%Y-%m-%d"))) %>% 
+  summarise(value = mean(average))
+```
+
+```{r, echo = F}
+#Trend
+# co2_present_mnth %>% 
+#   autoplot(value, colour = "grey") + 
+#   #geom_lines(aes(y=value), colour = "#D55E00") + 
+#   labs(
+#     y = "CO2 (ppm)", 
+#     x = "time", 
+#     title = "CO2 levels in Mauna, Hawaii"
+#   )
+```
+
+
+
+
+```{r, echo = F, fig.height=2.5, fig.width=6}
+#Lab Plots 
+co2_pre <- co2_present_mnth %>% 
+  gg_lag(value, geom = 'point') + 
+  labs(x = "lag(value,k)", 
+       title = "Lag Plots for CO2 (ppm)")
+
+
+CO2_ACF <- co2_present_mnth %>% 
+  ACF(value) %>% 
+  autoplot() + labs(title = "The ACF for CO2 (ppm) at Muana Observatory")
+
+grid.arrange(co2_pre, CO2_ACF, ncol = 2)  
+# add histogram maybe?
+```
+
+```{r, echo = F, fig.height=3, fig.width=3}
+co2_present_mnth <- co2_present_mnth[-c(which(is.na(co2_present_mnth))), ]
+# which(is.na(co2_present_mnth))
+```
+
+```{r, echo = F, fig.height=3, fig.width=3}
+co2_present_mnth <- na.locf(co2_present_mnth)
+```
+
+```{r, echo = F, fig.height=2.25, fig.width=6}
+# seasonal decomposition
+dcmp <- co2_present_mnth %>% 
+  model(stl = STL(value))
+co2_dcmp_components <- components(dcmp) 
+
+# head(co2_dcmp_components)
+components_trend_cycle<-co2_dcmp_components%>%
+  as_tsibble() %>% 
+  autoplot(value, colour = 'gray')  +
+  geom_line(aes(y=trend), color = 'purple') +
+  labs(
+    y = "CO2 Level (ppm)",
+    title = "CO2 Levels in Mauna Loa, Hawaii"
+  )
+
+co2_separate_components <-components(dcmp) %>% autoplot()
+
+grid.arrange(components_trend_cycle, co2_separate_components, ncol = 2)
+```
+
+```{r, echo = F}
+#Seasonal Plot 
+eda1 <- co2_present_mnth %>% 
+  gg_season(value, labels="both") + 
+  labs(y= "CO2 (ppm)",
+       title = "Seasonal Plot: CO2 Levels in Mauna Observatory, Hawaii",
+       x = "Month")
+ 
+```
+
+```{r, echo = F, fig.height=2.5, fig.width=7}
+#Seasonal Subseries plot 
+eda2 <- co2_present_mnth %>% gg_subseries(value) + 
+  labs(
+    y = "CO2 (ppm)",
+    title = "Seasonal Subseries Plots of CO2 Levels at Mauna Observatory, Hawaii"
+  )
+eda1 | eda2
+```
+## (1 point) Task 2b: Compare linear model forecasts against realized CO2
+
+Descriptively compare realized atmospheric CO2 levels to those predicted by your forecast from a linear time model in 1997 (i.e. "Task 2a"). (You do not need to run any formal tests for this task.) 
+
+```{r, echo = F, fig.height=1.5, fig.width=3}
+lin_forecast <- forecast(linear_model, h=312)
+lin_forecast_df <- data.frame(lin_forecast)
+lin_forecast_df$index = yearmonth(row.names(lin_forecast_df))
+
+
+# plot with 80 & 95% ribbons
+comp_plot <- lin_forecast_df %>%
+  ggplot() + aes(x=index, y = Point.Forecast, color = "Linear Model") + geom_line() + 
+  geom_ribbon(aes(ymax = Hi.80, ymin = Lo.80, fill = "80%"), alpha = 0.4, color = NA) + 
+  geom_ribbon(aes(ymax = Hi.95, ymin = Lo.95, fill = "95%"), alpha = 0.2, color = NA) +
+  geom_line(data=co2_present_mnth, aes(x=mnth, y =value, color = "Actual")) +
+  scale_fill_manual("", values = c("blue", "blue")) + 
+  ggtitle("Comparing Actual vs Predicted") + ylab("co2") + xlab("Time")
+
+comp_plot
+```
+
+
+
+
+## (1 point) Task 3b: Compare ARIMA models forecasts against realized CO2  
+
+```{r, echo = F, fig.height=1.5, fig.width=3}
+comp_plot <- forecast_arima %>%
+  autoplot() + 
+  geom_line(data=co2_present_mnth, aes(x=mnth, y =value, color = "Actual")) +
+  ggtitle("Comparing Actual vs Predicted") + ylab("co2") + xlab("Time")
+
+comp_plot
+```
+
+
+## (3 points) Task 4b: Evaluate the performance of 1997 linear and ARIMA models 
+
+
+```{r, echo = F}
+windowed <- co2_present_mnth %>%
+  filter_index("1998-1"~ "2023-12")
+```
+
+#Linear Model Eval
+
+```{r, echo = F}
+lin_fore_acc <- forecast(linear_model, h = 312)
+```
+
+
+
+```{r, echo = F}
+#linear model
+
+accuracy(lin_fore_acc, windowed$value)
+```
+
+```{r, echo = F, fig.height=2, fig.width=2}
+checkresiduals(linear_model)
+```
+
+```{r, echo = F}
+residuals_linear <- residuals(linear_model)
+Box.test(residuals_linear, lag = 10, type = "Ljung-Box")
+```
+
+#ARIMA Model Eval
+
+```{r, echo = F}
+forecast_arima_acc  <- forecast(sar_bic, h = 312)
+accuracy(forecast_arima_acc$.mean, windowed$value)
+```
+
+
+```{r, echo = F, fig.height=1, fig.width=2}
+#residuals arima
+
+sar_bic %>%
+  augment() %>%
+  ACF(.resid) %>%
+  autoplot()
+
+```
+
+
+```{r, echo = F, fig.height=3, fig.width=3}
+#box test arima 
+
+resid.sar <- sar_bic %>%
+  augment() %>%
+  dplyr::select(.resid) %>%
+  as.ts()
+
+Box.test(resid.sar, lag = 10, type = "Ljung-Box")
+```
+
+
+## (4 points) Task 5b: Train best models on present data
+
+
+```{r, echo = F, fig.height=2, fig.width=7}
+
+# Seasonally adjust the weekly NOAA data
+sa_noaa_data <- stl(x = ts(co2_present_mnth$value, frequency = 12), s.window = "periodic")
+co2_present_mnth$sa_co2_level <- sa_noaa_data$time.series[, "trend"]
+
+# Split data into training and test sets
+# Use the last two years (104 weeks) as the test set
+test_end_date <- max(co2_present_mnth$mnth)
+test_start_date <- test_end_date - 104
+
+sa_train <- filter(co2_present_mnth, mnth < test_start_date)
+sa_test <- filter(co2_present_mnth, mnth >= test_start_date)
+
+arima_ns <- auto.arima(sa_train$value)
+
+# ARIMA model for SA series
+arima_sa <- auto.arima(sa_train$sa_co2_level)
+
+# Measure performance in-sample
+ns_in_sample <- residuals(arima_ns)
+sa_in_sample <- residuals(arima_sa)
+
+# Measure performance pseudo-out-of-sample
+ns_forecast <- forecast(arima_ns, h = nrow(sa_test))
+sa_forecast <- forecast(arima_sa, h = nrow(sa_test))
+
+
+values_ns_forecast <- ns_forecast$value[is.numeric(ns_forecast$value)]
+values_sa_forecast <- sa_forecast$value[is.numeric(sa_forecast$value)]
+
+
+ns_pseudo_out_sample <- ns_forecast$mean - sa_test$value
+sa_pseudo_out_sample <- sa_forecast$mean - sa_test$value
+
+# # Fit polynomial time-trend model to SA series
+poly_trend <- sa_train %>% model(trend = TSLM(value ~ trend() + I(trend()^2) + I(trend()^3) + season()))
+sa_poly_forecast <- predict(poly_trend, newdata = sa_test)
+
+# Compare the performance of ARIMA and polynomial time-trend models
+ns_rmse <- sqrt(mean(ns_pseudo_out_sample^2))
+
+sa_rmse <- sqrt(mean(sa_pseudo_out_sample^2))
+
+poly_rmse <- sqrt(mean((sa_poly_forecast$.mean - sa_test$value)^2))
+
+print("RMSE for ARIMA model (NSA):")
+print(ns_rmse)
+
+print("RMSE for ARIMA model (SA):")
+print(sa_rmse)
+
+print("RMSE for Polynomial Time-Trend model (SA):")
+print(poly_rmse)
+
+residuals_ns <- residuals(arima_ns)
+
+
+# Plot the residuals ns
+par(mfrow=c(1,4))
+plot(residuals_ns, xlab = "Time", ylab = "Residuals", main = "Residuals Plot")
+
+residuals_sa <- residuals(arima_sa)
+
+# Plot the residuals sa
+plot(residuals_sa, xlab = "Time", ylab = "Residuals", main = "Residuals Plot")
+
+#out sample
+# Plot the residuals sa out 
+# ns_pseudo_out_sample
+plot(ns_pseudo_out_sample, xlab = "Time", ylab = "Forecasted - Actual", main = "Pseudo/Out Plot NS")
+#Plot the residuals ns out
+plot(sa_pseudo_out_sample, xlab = "Time", ylab = "Forecasted - Actual", main = "Pseudo/Out Plot SA")
+
+grid.arrange(autoplot(ns_forecast), autoplot(sa_forecast), autoplot(sa_poly_forecast), ncol=3)
+```
+```{r}
+plot(residuals(poly_trend)$.resid, main = "Residuals Plot")
+glance(poly_trend)$AIC
+AIC(arima_sa)
+```
+
+## (3 points) Task Part 6b: How bad could it get?
+
+
+```{r, echo = F}
+# ns_forecast
+# sa_forecast
+# sa_poly_forecast
+```
+
+
+
+```{r, echo = F}
+
+# long_forecast_arima <- forecast(arima_ns, h = 4000)
+# long_forecast_arima
+# dist_param = parameters(long_forecast_arima$me)
+# 
+# arima_ci <- apply(data.frame(dist_param),1,  predict_int)
+# 
+# arima_lo <- arima_ci[1, ]
+# arima_hi <- arima_ci[2, ]
+
+```
+
+```{r, echo = F}
+# idx = long_forecast_arima$index
+# plot <- ggplot()  + geom_line(data = long_forecast_arima, aes(x=index, y = .mean, color = "ARIMA Model")) +
+#   geom_ribbon(aes(x = idx, ymax = arima_hi, ymin = arima_lo, fill = "ARIMA Model"), alpha = 0.4, color = NA) +
+#   geom_hline(yintercept = 500)
+# plot
+```
+
+```{r, echo = F}
+long_forecast_arima_ns <- data.frame(forecast(arima_ns, h = 1000))
+
+long_forecast_arima_sa <- data.frame(forecast(arima_sa, h = 1000))
+
+sa_poly_long <- forecast(poly_trend, h=1000)
+dist_param = parameters(sa_poly_long$value)
+
+sa_poly_ci <- apply(data.frame(dist_param),1,  predict_int)
+
+sa_poly_lo <- sa_poly_ci[1, ]
+sa_poly_hi <- sa_poly_ci[2, ]
+
+
+long_forecast_arima_ns$index <- sa_poly_long$mnth
+long_forecast_arima_sa$index <- sa_poly_long$mnth
+```
+
+```{r, echo = F}
+first_arima_ns_lower <- long_forecast_arima_ns[min(which(long_forecast_arima_ns$Hi.95 > 420 & long_forecast_arima_ns$Hi.95 < 421)), 'index']
+last_arima_ns_lower <- long_forecast_arima_ns[max(which(long_forecast_arima_ns$Hi.95 > 420 & long_forecast_arima_ns$Hi.95 < 421)), 'index']
+first_arima_ns_point <- long_forecast_arima_ns[min(which(long_forecast_arima_ns$Point.Forecast > 420 & long_forecast_arima_ns$Point.Forecast < 421)), 'index']
+last_arima_ns_point <- long_forecast_arima_ns[max(which(long_forecast_arima_ns$Point.Forecast > 420 & long_forecast_arima_ns$Point.Forecast < 421)), 'index']
+first_arima_ns_upper <- long_forecast_arima_ns[min(which(long_forecast_arima_ns$Lo.95 > 420 & long_forecast_arima_ns$Lo.95 < 421)), 'index']
+last_arima_ns_upper <- long_forecast_arima_ns[max(which(long_forecast_arima_ns$Lo.95 > 420 & long_forecast_arima_ns$Lo.95 < 421)), 'index']
+
+row_arima_ns <- c(paste0(first_arima_ns_point), paste('(', first_arima_ns_lower, ',', first_arima_ns_upper, ')'),
+                paste0(last_arima_ns_point), paste('(', last_arima_ns_lower, ',', last_arima_ns_upper, ')'))
+
+
+first_arima_sa_lower <- long_forecast_arima_sa[min(which(long_forecast_arima_sa$Hi.95 > 420 & long_forecast_arima_sa$Hi.95 < 421)), 'index']
+last_arima_sa_lower <- long_forecast_arima_sa[max(which(long_forecast_arima_sa$Hi.95 > 420 & long_forecast_arima_sa$Hi.95 < 421)), 'index']
+first_arima_sa_point <- long_forecast_arima_sa[min(which(long_forecast_arima_sa$Point.Forecast > 420 & long_forecast_arima_sa$Point.Forecast < 421)), 'index']
+last_arima_sa_point <- long_forecast_arima_sa[max(which(long_forecast_arima_sa$Point.Forecast > 420 & long_forecast_arima_sa$Point.Forecast < 421)), 'index']
+# null values
+# first_arima_sa_upper <- long_forecast_arima_sa[min(which(long_forecast_arima_sa$Lo.95 > 420 & long_forecast_arima_sa$Lo.95 < 421)), 'index']
+# last_arima_sa_upper <- long_forecast_arima_sa[max(which(long_forecast_arima_sa$Lo.95 > 420 & long_forecast_arima_sa$Lo.95 < 421)), 'index']
+
+row_arima_sa <- c(paste0(first_arima_sa_point), paste('(', first_arima_sa_lower, ',', 'N/A', ')'),
+                paste0(last_arima_sa_point), paste('(', last_arima_sa_lower, ',', 'N/A', ')'))
+
+first_sa_poly_lower <- sa_poly_long[[min(which(sa_poly_hi > 420 & sa_poly_hi < 421)), 'mnth']]
+last_sa_poly_lower <- sa_poly_long[[max(which(sa_poly_hi > 420 & sa_poly_hi < 421)), 'mnth']]
+first_sa_poly_point <- sa_poly_long[[min(which(sa_poly_long$.mean > 420 & sa_poly_long$.mean< 421)), 'mnth']]
+last_sa_poly_point <- sa_poly_long[[max(which(sa_poly_long$.mean > 420 & sa_poly_long$.mean< 421)), 'mnth']]
+first_sa_poly_upper <- sa_poly_long[[min(which(sa_poly_lo > 420 & sa_poly_lo < 421)), 'mnth']]
+last_sa_poly_upper <- sa_poly_long[[max(which(sa_poly_lo > 420 & sa_poly_lo < 421)), 'mnth']]
+
+row_sa_poly <- c(paste0(first_sa_poly_point), paste('(', first_sa_poly_lower, ',', first_sa_poly_upper, ')'),
+                paste0(last_sa_poly_point), paste('(', last_sa_poly_lower, ',', last_sa_poly_upper, ')'))
+
+tab_420 <- rbind(row_arima_ns, row_arima_sa, row_sa_poly )
+colnames(tab_420) = c('420: Predicted first time', '95% CI', '420: Predicted last time', '95% CI')
+rownames(tab_420) = c('ARIMA Not Seasonal Adjusted Model', 'ARIMA Seasonally Adjusted Model', 'Polynomial Model')
+tab_420
+```
+
+```{r, echo = F}
+# 500 prediction table
+first_arima_ns_lower <- long_forecast_arima_ns[min(which(long_forecast_arima_ns$Hi.95 > 500 & long_forecast_arima_ns$Hi.95 < 501)), 'index']
+last_arima_ns_lower <- long_forecast_arima_ns[max(which(long_forecast_arima_ns$Hi.95 > 500 & long_forecast_arima_ns$Hi.95 < 501)), 'index']
+first_arima_ns_point <- long_forecast_arima_ns[min(which(long_forecast_arima_ns$Point.Forecast > 500 & long_forecast_arima_ns$Point.Forecast < 501)), 'index']
+last_arima_ns_point <- long_forecast_arima_ns[max(which(long_forecast_arima_ns$Point.Forecast > 500 & long_forecast_arima_ns$Point.Forecast < 501)), 'index']
+first_arima_ns_upper <- long_forecast_arima_ns[min(which(long_forecast_arima_ns$Lo.95 > 500 & long_forecast_arima_ns$Lo.95 < 501)), 'index']
+last_arima_ns_upper <- long_forecast_arima_ns[max(which(long_forecast_arima_ns$Lo.95 > 500 & long_forecast_arima_ns$Lo.95 < 501)), 'index']
+
+row_arima_ns <- c(paste0(first_arima_ns_point), paste('(', first_arima_ns_lower, ',', first_arima_ns_upper, ')'),
+                paste0(last_arima_ns_point), paste('(', last_arima_ns_lower, ',', last_arima_ns_upper, ')'))
+
+
+first_arima_sa_lower <- long_forecast_arima_sa[min(which(long_forecast_arima_sa$Hi.95 > 500 & long_forecast_arima_sa$Hi.95 < 501)), 'index']
+last_arima_sa_lower <- long_forecast_arima_sa[max(which(long_forecast_arima_sa$Hi.95 > 500 & long_forecast_arima_sa$Hi.95 < 501)), 'index']
+first_arima_sa_point <- long_forecast_arima_sa[min(which(long_forecast_arima_sa$Point.Forecast > 500 & long_forecast_arima_sa$Point.Forecast < 501)), 'index']
+last_arima_sa_point <- long_forecast_arima_sa[max(which(long_forecast_arima_sa$Point.Forecast > 500 & long_forecast_arima_sa$Point.Forecast < 501)), 'index']
+# null values
+# first_arima_sa_upper <- long_forecast_arima_sa[min(which(long_forecast_arima_sa$Lo.95 > 420 & long_forecast_arima_sa$Lo.95 < 421)), 'index']
+# last_arima_sa_upper <- long_forecast_arima_sa[max(which(long_forecast_arima_sa$Lo.95 > 420 & long_forecast_arima_sa$Lo.95 < 421)), 'index']
+
+row_arima_sa <- c(paste0(first_arima_sa_point), paste('(', first_arima_sa_lower, ',', 'N/A', ')'),
+                paste0(last_arima_sa_point), paste('(', last_arima_sa_lower, ',', 'N/A', ')'))
+
+first_sa_poly_lower <- sa_poly_long[[min(which(sa_poly_hi > 500 & sa_poly_hi < 501)), 'mnth']]
+last_sa_poly_lower <- sa_poly_long[[max(which(sa_poly_hi > 500 & sa_poly_hi < 501)), 'mnth']]
+first_sa_poly_point <- sa_poly_long[[min(which(sa_poly_long$.mean > 500 & sa_poly_long$.mean< 501)), 'mnth']]
+last_sa_poly_point <- sa_poly_long[[max(which(sa_poly_long$.mean > 500 & sa_poly_long$.mean< 501)), 'mnth']]
+first_sa_poly_upper <- sa_poly_long[[min(which(sa_poly_lo > 500 & sa_poly_lo < 501)), 'mnth']]
+last_sa_poly_upper <- sa_poly_long[[max(which(sa_poly_lo > 500 & sa_poly_lo < 501)), 'mnth']]
+
+row_sa_poly <- c(paste0(first_sa_poly_point), paste('(', first_sa_poly_lower, ',', first_sa_poly_upper, ')'),
+                paste0(last_sa_poly_point), paste('(', last_sa_poly_lower, ',', last_sa_poly_upper, ')'))
+
+tab_500 <- rbind(row_arima_ns, row_arima_sa, row_sa_poly )
+colnames(tab_500) = c('Predicted first time', '95% CI', 'Predicted last time', '95% CI')
+rownames(tab_500) = c('ARIMA (NSA)', 'ARIMA (SA)', 'Polynomial Model')
+tab_500
+```
+
+```{r}
+# 2122 - 2016 = 106 * 12 = 1272 + 6 + 1 = 1279
+arima_forecast_2122 = forecast(arima_sa, h = 1279)
+arima_predict_2122 <- tail(data.frame(arima_forecast_2122), n=1)
+point_2122 <- arima_predict_2122$Point.Forecast
+
+arima_lo_2122 <- arima_predict_2122$Lo.95
+arima_hi_2122 <- arima_predict_2122$Hi.95
+
+arima_row <- c(paste0((point_2122)), paste("(", arima_lo_2122, ',', arima_hi_2122, ')'))
+
+poly_forecast_2122 = forecast(poly_trend, h = 1279)
+poly_predict_2122 <- tail(poly_forecast_2122, n=1)
+poly_point_2122 <- poly_predict_2122$.mean
+
+dist_param = parameters(poly_predict_2122$value)
+poly_ci_2122 <- apply(data.frame(dist_param),1,  predict_int)
+poly_lo_2122 <- poly_ci_2122[1]
+poly_hi_2122 <- poly_ci_2122[2]
+
+poly_row <- c(paste0((poly_point_2122)), paste("(", poly_lo_2122, ',', poly_hi_2122, ')'))
+
+tab_2122 <- rbind(arima_row, poly_row)
+tab_2122
+```
+
+
+```{r, echo = F}
+# 
+# first_arima_lower <- long_forecast_arima[[min(which(arima_hi > 420 & arima_hi < 421)), 'index']]
+# last_arima_lower <- long_forecast_arima[[max(which(arima_hi > 420 & arima_hi < 421)), 'index']]
+# first_arima_point <- long_forecast_arima[[min(which(long_forecast_arima$.mean > 420 & long_forecast_arima$.mean< 421)), 'index']]
+# last_arima_point <- long_forecast_arima[[max(which(long_forecast_arima$.mean > 420 & long_forecast_arima$.mean< 421)), 'index']]
+# # lower bound never crosses 420
+# # first_arima_upper <- long_forecast_arima[[min(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+# # last_arima_upper <- long_forecast_arima[[max(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+# 
+# row_arima <- c(paste0(first_arima_point), paste('(', first_arima_lower, ',', 'N/A', ')'),
+#                 paste0(last_arima_point), paste('(', last_arima_lower, ',', 'N/A', ')'))
+# 
+# tab_420 <- rbind(row_arima)
+# colnames(tab_420) = c('420: Predicted first time', 'first time 95% CI', '420: Predicted last last', 'last time 95% CI')
+# rownames(tab_420) = c('ARIMA Model')
+# tab_420
+
+```
+
+```{r, echo = F}
+# 
+# first_arima_lower <- long_forecast_arima[[min(which(arima_hi > 500 & arima_hi < 501)), 'index']]
+# last_arima_lower <- long_forecast_arima[[max(which(arima_hi > 500 & arima_hi < 501)), 'index']]
+# first_arima_point <- long_forecast_arima[[min(which(long_forecast_arima$.mean > 500 & long_forecast_arima$.mean< 501)), 'index']]
+# last_arima_point <- long_forecast_arima[[max(which(long_forecast_arima$.mean > 500 & long_forecast_arima$.mean< 501)), 'index']]
+# # lower bound never crosses 420
+# # first_arima_upper <- long_forecast_arima[[min(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+# # last_arima_upper <- long_forecast_arima[[max(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+# 
+# row_arima <- c(paste0(first_arima_point), paste('(', first_arima_lower, ',', 'N/A', ')'),
+#                 paste0(last_arima_point), paste('(', last_arima_lower, ',', 'N/A', ')'))
+# 
+# tab_500 <- rbind(row_arima)
+# colnames(tab_500) = c('500: Predicted first time', 'first time 95% CI', '500: Predicted last last', 'last time 95% CI')
+# rownames(tab_500) = c('ARIMA Model')
+# tab_500
+```
+
+
+```{r, echo = F}
+# add prediction intervals for SEASONALLY ADJUSTED
+# long_forecast_arima = forecast(arima_sa, h = 4000)
+# 
+# long_forecast_arima[min(which(long_forecast_arima$mean > 420)), 'index'] # first time larger than 420
+# 
+# predict_int = function(row) {
+#   mu = row[1]
+#   sigma = row[2]
+#   me <- qnorm(0.975)*sigma
+#   return(c(lo = mu - me, hi = mu + me))
+# }
+# 
+# predict_int(mu = unname(unlist(d_var))[1], sigma =unname(unlist(d_var))[2])
+```
+
+```{r, echo = F}
+#SEASONALLY ADJUSTED
+# long_forecast_arima = forecast(arima_sa, h = 4000)
+# dist_param = parameters(long_forecast_arima$value)
+# 
+# arima_ci <- apply(data.frame(dist_param),1,  predict_int)
+# 
+# arima_lo <- arima_ci[1, ]
+# arima_hi <- arima_ci[2, ]
+
+```
+
+
+```{r, echo = F}
+#SEASONALLY ADJUSTED
+# idx = long_forecast_arima$index
+# plot <- ggplot()  + geom_line(data = long_forecast_arima, aes(x=index, y = .mean, color = "SA ARIMA Model")) +
+#   geom_ribbon(aes(x = idx, ymax = arima_hi, ymin = arima_lo, fill = "ARIMA Model"), alpha = 0.4, color = NA) +
+#   geom_hline(yintercept = 420) + 
+#   geom_hline(yintercept = 500)
+# plot
+```
+
+```{r, echo = F}
+# create longer forecasts
+# na_forecast_long <- forecast(arima_ns, h = 1000)
+# sa_forecast_long <- forecast(arima_sa, h = 1000)
+# sa_poly_long <- forecast(poly_trend, h=1000)
+```
+
+```{r, echo = F}
+# SA polynomial upper and lower bounds generator
+# dist_param = parameters(sa_poly_long$value)
+# 
+# sa_poly_ci <- apply(data.frame(dist_param),1,  predict_int)
+# 
+# sa_poly_lo <- sa_poly_ci[1, ]
+# sa_poly_hi <- sa_poly_ci[2, ]
+
+```
+
+```{r, echo = F}
+# 420 prediction table
+# first_na_lower <- na_forecast_long[min(which(na_forecast_long$Hi.95 > 420 & na_forecast_long$Hi.95 < 421)), 'index']
+# last_na_lower <- na_forecast_long[max(which(na_forecast_long$Hi.95 > 420 & na_forecast_long$Hi.95 < 421)), 'index']
+# first_na_point <- na_forecast_long[min(which(na_forecast_long$Point.Forecast > 420 & na_forecast_long$Point.Forecast < 421)), 'index']
+# last_na_point <- na_forecast_long[max(which(na_forecast_long$Point.Forecast > 420 & na_forecast_long$Point.Forecast < 421)), 'index']
+# first_na_upper <- na_forecast_long[min(which(na_forecast_long$Lo.95 > 420 & na_forecast_long$Lo.95 < 421)), 'index']
+# last_na_upper <- na_forecast_long[max(which(na_forecast_long$Lo.95 > 420 & na_forecast_long$Lo.95 < 421)), 'index']
+# 
+# row_arima <- c(paste0(first_arima_point), paste('(', first_arima_lower, ',', 'N/A', ')'),
+#                 paste0(last_arima_point), paste('(', last_arima_lower, ',', 'N/A', ')'))
+# 
+# tab_420 <- rbind(row_arima)
+# colnames(tab_420) = c('420: Predicted first time', 'first time 95% CI', '420: Predicted last last', 'last time 95% CI')
+# rownames(tab_420) = c('ARIMA Model')
+# tab_420
+```
+
+
+```{r, echo = F}
+#SEASONALLY ADJUSTED 
+# 
+# first_arima_lower <- long_forecast_arima[[min(which(arima_hi > 500 & arima_hi < 501)), 'index']]
+# last_arima_lower <- long_forecast_arima[[max(which(arima_hi > 500 & arima_hi < 501)), 'index']]
+# first_arima_point <- long_forecast_arima[[min(which(long_forecast_arima$.mean > 500 & long_forecast_arima$.mean< 501)), 'index']]
+# last_arima_point <- long_forecast_arima[[max(which(long_forecast_arima$.mean > 500 & long_forecast_arima$.mean< 501)), 'index']]
+# # lower bound never crosses 420
+# # first_arima_upper <- long_forecast_arima[[min(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+# # last_arima_upper <- long_forecast_arima[[max(which(arima_lo > 420 & arima_lo < 421)), 'index']]
+# 
+# row_arima <- c(paste0(first_arima_point), paste('(', first_arima_lower, ',', 'N/A', ')'),
+#                 paste0(last_arima_point), paste('(', last_arima_lower, ',', 'N/A', ')'))
+# 
+# tab_500 <- rbind(row_arima)
+# colnames(tab_500) = c('500: Predicted first time', 'first time 95% CI', '500: Predicted last last', 'last time 95% CI')
+# rownames(tab_500) = c('ARIMA Model')
+# tab_500
+```
