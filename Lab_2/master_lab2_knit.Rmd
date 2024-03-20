@@ -88,10 +88,14 @@ components_trend_cycle<-co2_dcmp_components%>%
   geom_line(aes(y=trend), color = 'purple') +
   labs(
     y = "CO2 Level (ppm)",
-    title = "CO2 Levels in Mauna Loa, Hawaii"
-  )
+    title = "CO2 Levels in Mauna Loa",
+    x = "Time"
+  ) + 
+  theme(axis.text.x = element_text(angle=35))
 
-co2_separate_components <-components(dcmp) %>% autoplot()
+co2_separate_components <-components(dcmp) %>% autoplot() + 
+  theme(axis.text.x = element_text(angle=35)) +
+  labs(x = "Time")
 #| fig.cap = 'Figure 1 - Terrestrial carbon dioxide levels and time series decomposition'
 grid.arrange(components_trend_cycle, co2_separate_components, ncol = 2)
 ```
@@ -104,20 +108,22 @@ To analyze the trend year-by-year, Figure 2 provides another angle to view the u
 eda1 <- df_co2 %>% 
   gg_season(value, labels="both") + 
   labs(y= "CO2 (ppm)",
-       title = "Seasonal Plot: CO2 Levels in Mauna Observatory, Hawaii",
+       title = "CO2 levels by Year",
        x = "Month")
  
 ```
 A break-down of the overall trend into time-trends in CO2 levels per month is presented in Figure 3. One will note CO2 levels appear to be lowest, on average in September and October and peak in May. This reflects the growing season patterns discussed by Keeling (1960). Although Keeling had fewer data points to consider, his observation transcends time. What is not clear is whether the upward trend in average CO2 levels is constant or increasing at a faster pace than in Keelings day. The trend line in Figure one appears to present as slightly convex or increasing at an increasing rate, especially after 1990. Also, the distance between lines in Figure 2 appears to increase in the 1990s as there is more white space between lines than previous decades, in particular when compared to the 1950s and 1960s. 
 
-```{r, echo = F, fig.height=2, fig.width=7}
+```{r, echo = F, fig.height=2, fig.width=7.5, message=FALSE}
 #Seasonal Subseries plot 
 #| fig.cap = 'Figure 3 - The seasonal subseries of carbon dioxide levels in Mauna Loa'
 eda2 <- df_co2 %>% gg_subseries(value) + 
   labs(
     y = "CO2 (ppm)",
-    title = "Seasonal Subseries Plots of CO2 Levels at Mauna Loa Observatory, Hawaii"
-  )
+    title = "CO2 Levels per Month"
+  ) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE)) + 
+  labs(x = "Time")
 eda1 | eda2
 ```
 
@@ -129,14 +135,14 @@ Thus far, the data visualizations suggest a non-stationary process with strong s
 CO2_lags <- df_co2 %>% 
   gg_lag(value, geom = 'point') + 
   labs(x = "lag(value,k)", 
-       title = "Lag Plots for CO2 (ppm)") +
+       title = "Lag Plot") +
   scale_y_discrete(guide = guide_axis(check.overlap = TRUE)) + 
   scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
 
 
 CO2_ACF <- df_co2 %>% 
   ACF(value) %>% 
-  autoplot() + labs(title = "The ACF for CO2 (ppm) at Muana Loa Observatory")
+  autoplot() + labs(title = "The ACF for CO2 (ppm)")
 
 grid.arrange(CO2_lags, CO2_ACF, ncol = 2)  
 # add histogram maybe?--Not enough room. Really doesn't tell us much about the time series
@@ -160,21 +166,29 @@ where $y_{t}$ is the level of carbon dioxide in time $t$ and $\epsilon_{t}$ is t
 ### Log-Linear Model consideration
 The data has a pretty linear trend with equal variance throughout the data. From the plot, you can see that a log transformation does not help with linearizing the data. Therefore, there is no transformation that is required for this data
 
-```{r, echo = F, fig.height=1.5, fig.width=3}
+```{r, echo = F, fig.height=1.5, fig.width=4}
 # plot showing log transformation
 plot1 <- df_co2 %>%
   ggplot() + geom_point(aes(x= index, y = value)) +
-  labs(title = "Untransformed Data")
+  labs(title = "Untransformed Data",
+       x = "Time",
+       y = "CO2") + 
+  theme(axis.text.x = element_text(angle=35))+ 
+  theme(plot.title = element_text(size=8))
 plot2 <- df_co2 %>%
   ggplot() + geom_point(aes(x= index, y = log(value))) +
-  labs(title = "Log Transformation Data")
+  labs(title = "Log Transformation Data",
+       x = "Time",
+       y = "CO2") + 
+  theme(axis.text.x = element_text(angle=35))+ 
+  theme(plot.title = element_text(size=8))
 
 grid.arrange(plot1, plot2, ncol = 2)
 ```
 
 The time trend plots for the linear and quadratic models appear smooth compared to the polynomial model. Both the linear and quadratic model have patterns in the residuals and significant lags in the ACF plot; all of this indicates that seasonality has not yet been accounted for. The polynomial residuals appear more like a white noise process, but there are significant lags in ACF which potentially indicate that the series needs to be detrended.
 
-```{r, echo = F, fig.height=1.5, fig.width=7}
+```{r, echo = F, fig.height=2, fig.width=7}
 #### 2A NORA WORK FROM 3/5
 
 # Fit a linear time trend model
@@ -190,7 +204,8 @@ lin_plot <- df_co2 %>%
   geom_line(aes(x = index, y=linear_model$fitted), color = 'blue') + 
   labs(title = "Fitted Linear Model",
        x = 'time',
-       y = 'CO2 (ppm)')
+       y = 'CO2 (ppm)')+ 
+  theme(axis.text.x = element_text(angle=35))+ theme(plot.title = element_text(size=10))
 
 #comment out log-linear model
 # add log linear model
@@ -214,7 +229,8 @@ quad_plot <- df_co2 %>%
   geom_line(aes(x = index, y=fitted(quadratic_model)$.fitted), color = 'blue') + 
   labs(title = "Fitted Quadratic Model",
        x = 'time',
-       y = 'CO2 (ppm)')
+       y = 'CO2 (ppm)')+ 
+  theme(axis.text.x = element_text(angle=35))+ theme(plot.title = element_text(size=10))
 
 # Test for logarithmic transformation
 # log_model <- lm(log(co2) ~ time(co2))
@@ -239,8 +255,8 @@ poly_plot <- df_co2 %>%
   geom_line(aes(x = index, y=fitted(polynomial_model)$.fitted), color = 'blue') + 
   labs(title = "Fitted Polynomial Model",
        x = 'time',
-       y = 'CO2 (ppm)') + 
-  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
+       y = 'CO2') + 
+  theme(axis.text.x = element_text(angle=35))+ theme(plot.title = element_text(size=10))
 
 grid.arrange(lin_plot, quad_plot, poly_plot, ncol = 3)
 
@@ -252,9 +268,9 @@ forecast_polynomial <- forecast(polynomial_model, h = 276)
 ```
 ```{r, echo=F, fig.height=3, fig.width=6}
 par(mfrow=c(2,3))  
-plot(residuals_linear, main = "Residuals of Linear Model")
-plot(residuals_quadratic, type = "l", main = "Residuals of Quadratic Model")
-plot(residuals_poly,type = "l", main = "Residuals of Polynomial Model")
+plot(residuals_linear, main = "Linear Residuals")
+plot(residuals_quadratic, type = "l", main = "Quadratic Residuals")
+plot(residuals_poly,type = "l", main = "Polynomial Residuals")
 acf(residuals_linear)
 acf(residuals_quadratic)
 acf(residuals_poly)
@@ -264,7 +280,7 @@ The AIC and BIC measurements form the three fitted models indicate the polynomia
 
 Compared to the linear and quadratic models, the polynomial had the strongest performance in both, with significantly lower AIC and BIC
 
-```{r}
+```{r, echo=FALSE}
 mod_names <- c("linear", "quadratic", "polynomial")
 mod_aic <- c(AIC(linear_model),  glance(quadratic_model)$AIC, glance(polynomial_model)$AIC)
 mod_bic <- c(BIC(linear_model),  glance(quadratic_model)$BIC, glance(polynomial_model)$BIC)
@@ -280,7 +296,8 @@ The forecast until 2020 using the polynomial model had a similar seasonal patter
 forecast_polynomial %>%
 autoplot(colour="cornflowerblue") +
 autolayer(df_co2, colour="black") +
-geom_line(data=polynomial_model %>% augment(), aes(index,.fitted,color=.model))
+geom_line(data=polynomial_model %>% augment(), aes(index,.fitted,color=.model), show.legend = FALSE) + 
+  labs(title = "Polynomial Forecast") + theme(axis.text.x = element_text(angle=15))
 ```
 
 
@@ -379,7 +396,9 @@ forecast_arima <- forecast(sar_bic, h = 300)
 forecast_arima %>%
 autoplot(colour="cornflowerblue") +
 autolayer(df_co2, colour="black") +
-geom_line(data=sar_bic %>% augment(), aes(index,.fitted,color=.model))
+geom_line(data=sar_bic %>% augment(), aes(index,.fitted,color=.model), show.legend = FALSE)+ 
+  labs(title = "ARIMA Forecast") + 
+  theme(axis.text.x = element_text(angle=15))
 ```
 
 
@@ -442,7 +461,7 @@ long_forecast_linear$index = yearmonth(row.names(long_forecast_linear))
 
 The ARIMA model had an AIC of 181 (see model output in section 3a), which was not as low as the polynomial model, but lower than both the linear and quadratic models, which could not account for seasonality. However, the polynomial model does poorly out of sample, as it predicts CO2 levels to peak and then steeply drop off towards negative predictions. Thus the best model for long-term forecasts is the ARIMA model
 
-```{r, echo = F, fig.height=2.5, fig.width=4}
+```{r, echo = F, fig.height=2.5, fig.width=4, warning=FALSE}
 idx = long_forecast_arima$index
 plot <- ggplot()  + geom_line(data = long_forecast_arima, aes(x=index, y = .mean, color = "ARIMA Model")) +
   geom_ribbon(aes(x = idx, ymax = arima_hi, ymin = arima_lo, fill = "ARIMA Model"), alpha = 0.4, color = NA) +
@@ -454,8 +473,12 @@ plot <- ggplot()  + geom_line(data = long_forecast_arima, aes(x=index, y = .mean
   geom_ribbon(data = long_forecast_linear, aes(x=index, ymax = Hi.95, ymin = Lo.95, fill = "Linear Model"), alpha = 0.4, color = NA) + 
   geom_hline(yintercept = 420, label = "500") + 
   geom_hline(yintercept = 500, label = "420") + 
-  geom_text(aes( 0, 420, label = 420, vjust = -1), size = 3) + 
-  geom_text(aes( 0, 500, label = 500, vjust = -1), size = 3)
+  geom_text(aes( 0, 300, label = 420, vjust = -1), size = 3) + 
+  geom_text(aes( 0, 500, label = 500, vjust = -1), size = 3) + 
+  labs(title = "Forecast Comparison",
+       x = "time", 
+       y = "Co2") + 
+  theme(axis.text.x = element_text(angle=15))
 plot
 ```
 
@@ -603,11 +626,13 @@ co2_present %>%
   aes(x=time_index, y=average) + 
   geom_line(color = 'steelblue') +
   labs(
-    title = TeX(r'(Weekly Mean $CO_2$)'),
-    subtitle = 'The "Keeling Curve"',
-    x = 'Week and Year',
-    y = TeX(r'($CO_2$ parts per million)')
-  )
+    title = TeX('Present Trend'),
+    x = 'Time',
+    y = TeX(r'($CO_2$)')
+  )+ 
+  theme(plot.title = element_text(size=13))  + 
+  theme(axis.text.x = element_text(angle=35))
+
 ```
 
 ```{r, echo = F}
@@ -637,12 +662,13 @@ co2_present_mnth <- co2_present %>%
 co2_pre <- co2_present_mnth %>% 
   gg_lag(value, geom = 'point') + 
   labs(x = "lag(value,k)", 
-       title = "Lag Plots for CO2 (ppm)")
+       title = "Lag Plots")  + 
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
 
 
 CO2_ACF <- co2_present_mnth %>% 
   ACF(value) %>% 
-  autoplot() + labs(title = "The ACF for CO2 (ppm) at Muana Observatory")
+  autoplot() + labs(title = "The ACF for CO2 (ppm)")
 
 grid.arrange(co2_pre, CO2_ACF, ncol = 2)  
 # add histogram maybe?
@@ -670,10 +696,13 @@ components_trend_cycle<-co2_dcmp_components%>%
   geom_line(aes(y=trend), color = 'purple') +
   labs(
     y = "CO2 Level (ppm)",
-    title = "CO2 Levels in Mauna Loa, Hawaii"
-  )
+    title = "CO2 Levels Present",
+    x = "time"
+  ) + theme(axis.text.x = element_text(angle=15))
 
-co2_separate_components <-components(dcmp) %>% autoplot()
+co2_separate_components <-components(dcmp) %>% autoplot()  + 
+  theme(axis.text.x = element_text(angle=15)) +
+  labs(x = "time")
 
 grid.arrange(components_trend_cycle, co2_separate_components, ncol = 2)
 ```
@@ -683,7 +712,7 @@ grid.arrange(components_trend_cycle, co2_separate_components, ncol = 2)
 eda1 <- co2_present_mnth %>% 
   gg_season(value, labels="both") + 
   labs(y= "CO2 (ppm)",
-       title = "Seasonal Plot: CO2 Levels in Mauna Observatory, Hawaii",
+       title = "CO2 by Month and Year",
        x = "Month")
  
 ```
@@ -693,8 +722,10 @@ eda1 <- co2_present_mnth %>%
 eda2 <- co2_present_mnth %>% gg_subseries(value) + 
   labs(
     y = "CO2 (ppm)",
-    title = "Seasonal Subseries Plots of CO2 Levels at Mauna Observatory, Hawaii"
-  )
+    title = "CO2 by month",
+    x = "time"
+  ) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
 eda1 | eda2
 ```
 
@@ -710,12 +741,14 @@ lin_forecast_df$index = yearmonth(row.names(lin_forecast_df))
 
 # plot with 80 & 95% ribbons
 comp_plot <- lin_forecast_df %>%
-  ggplot() + aes(x=index, y = Point.Forecast, color = "Linear Model") + geom_line() + 
+  ggplot() + aes(x=index, y = Point.Forecast, color = "Linear Model") + geom_line(show.legend = FALSE) + 
   geom_ribbon(aes(ymax = Hi.80, ymin = Lo.80, fill = "80%"), alpha = 0.4, color = NA) + 
   geom_ribbon(aes(ymax = Hi.95, ymin = Lo.95, fill = "95%"), alpha = 0.2, color = NA) +
-  geom_line(data=co2_present_mnth, aes(x=mnth, y =value, color = "Actual")) +
+  geom_line(data=co2_present_mnth, aes(x=mnth, y =value, color = "Actual"), show.legend = FALSE) +
   scale_fill_manual("", values = c("blue", "blue")) + 
-  ggtitle("Comparing Actual vs Predicted") + ylab("co2") + xlab("Time")
+  ggtitle("Comparing Actual vs Predicted") + ylab("co2") + xlab("Time") + 
+  theme(axis.text.x = element_text(angle=25))+ 
+  theme(plot.title = element_text(size=12))
 
 comp_plot
 ```
@@ -730,8 +763,10 @@ The ARIMA model did a better job at forecasting than the linear model, but it st
 ```{r, echo = F, fig.height=1.5, fig.width=3}
 comp_plot <- forecast_arima %>%
   autoplot() + 
-  geom_line(data=co2_present_mnth, aes(x=mnth, y =value, color = "Actual")) +
-  ggtitle("Comparing Actual vs Predicted") + ylab("co2") + xlab("Time")
+  geom_line(data=co2_present_mnth, aes(x=mnth, y =value, color = "Actual"), show.legend = FALSE) +
+  ggtitle("Comparing Actual vs Predicted") + ylab("co2") + xlab("Time")+ 
+  theme(axis.text.x = element_text(angle=25))+ 
+  theme(plot.title = element_text(size=12))
 
 comp_plot
 ```
@@ -806,12 +841,12 @@ The ARIMA model has a better RMSE than the linear model (8.6), and the residual 
 
 ## (4 points) Task 5b: Train best models on present data
 
-The residuals plots show that the ARIMA model trained on the seasonally adjusted CO2 data frame performs better than the non-seasonally adjusted data frame (the in-sample residuals stay closer to 0). 
+The residuals plots show that the ARIMA model trained on the seasonally adjusted CO2 data frame performs better than the non-seasonally adjusted data frame (the in-sample residuals stay closer to 0), as it had the lowest AIC compared to the other models. The polynomial AIC was also good compared to the ARIMA NAS. 
 Analyzing the pseudo/out prediction values, we can see that the seasonally adjusted ARIMA model tends to overestimate CO2 values, while the non-seasonally adjusted model underestimates CO2 values.
 From the pseudo/out graph for the seasonally adjusted polynomial model, we see that for the first set time steps are forecasted fairly accurately, but further into the future the model severely underestimates the Co2 concentration with high error.
 The three forecasts for non-seasonally adjusted ARIMA, seasonally adjusted ARIMA, and polynomial model (same model as used in question 4b) show a difference in scale and trend for future predictions. SA ARIMA and NSA ARIMA models are similar, but SA overestimates in comparison to NSA. The polynomial model underestimates in comparison to the other two, and follows a nonlinear trend with significant dips. 
 
-```{r, echo = F, fig.height=3, fig.width=7.5}
+```{r, echo = F, fig.height=3, fig.width=7.5, warning=FALSE}
 
 # Seasonally adjust the weekly NOAA data
 sa_noaa_data <- stl(x = ts(co2_present_mnth$value, frequency = 12), s.window = "periodic")
@@ -893,13 +928,17 @@ plot(sa_pseudo_out_sample, xlab = "Time", ylab = "Forecasted - Actual", main = "
 # plot poly pseudo
 plot(poly_pseudo_out_sample, xlab = "Time", type = 'l', ylab = "Forecasted - Actual", main = "Pseudo/Out Plot SA")
 
+arima_na_plot <- autoplot(ns_forecast) + ggtitle("ARIMA NAS Forecast") + labs(y = "Co2")
+arima_sa_plot <- autoplot(sa_forecast) + ggtitle("ARIMA SA Forecast")
 poly_forecast_plot <- sa_poly_forecast %>%
   autoplot(show.legend = FALSE) + 
-  autolayer(sa_train, colour="black")
-grid.arrange(autoplot(ns_forecast), autoplot(sa_forecast), poly_forecast_plot, ncol=3)
+  autolayer(sa_train, colour="black") + ggtitle("Polynomial Forecast") +
+  labs(x = "Time",
+       y = "Co2")+ theme(axis.text.x = element_text(angle=25))
+grid.arrange(arima_na_plot, arima_sa_plot, poly_forecast_plot, ncol=3)
 ```
 
-```{r}
+```{r, echo=FALSE}
 models <- c("ARIMA NSA", "ARIMA SA", "Polynomial SA")
 aic <- c(AIC(arima_ns), AIC(arima_sa), glance(poly_trend)$AIC)
 
@@ -1037,7 +1076,7 @@ rownames(tab_500) = c('ARIMA (NSA)', 'ARIMA (SA)', 'Polynomial Model')
 tab_500
 ```
 
-```{r}
+```{r, echo=FALSE}
 # 2122 - 2016 = 106 * 12 = 1272 + 6 + 1 = 1279
 arima_forecast_2122 = forecast(arima_sa, h = 1279)
 arima_predict_2122 <- tail(data.frame(arima_forecast_2122), n=1)
@@ -1060,13 +1099,17 @@ poly_hi_2122 <- poly_ci_2122[2]
 poly_row <- c(paste0((poly_point_2122)), paste("(", poly_lo_2122, ',', poly_hi_2122, ')'))
 
 tab_2122 <- rbind(arima_row, poly_row)
+rownames(tab_2122) = c("ARIMA Model", "Polynomial Model")
+colnames(tab_2122) = c("Point Estimate", "95% confidence Interval")
 tab_2122
 ```
 
 # References
 
 Jiménez-de-la-Cuest, Diego and Thorsten Mauritsen. 2019. Emergent constraints on Earth’s transient and equilibrium response to doubled CO2 from post-1970s global warming. Nature Geosciences 12: 902-905. 
+
 Keeling, Charles D. 1960. The Concentration and Isotopic Abundances of Carbon Dioxide in the Atmosphere. Tellus 12(2)
+
 United Nations Climate Conference. 2023. Linking Nature Conservation with Climate Action. Retrieved from https://unfccc.int/cop28/5-key-takeaways#protecting-nature
 
 ```{r, echo = F}
