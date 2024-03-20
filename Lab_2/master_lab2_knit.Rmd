@@ -126,7 +126,9 @@ Thus far, the data visualizations suggest a non-stationary process with strong s
 CO2_lags <- df_co2 %>% 
   gg_lag(value, geom = 'point') + 
   labs(x = "lag(value,k)", 
-       title = "Lag Plots for CO2 (ppm)")
+       title = "Lag Plots for CO2 (ppm)") +
+  scale_y_discrete(guide = guide_axis(check.overlap = TRUE)) + 
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
 
 
 CO2_ACF <- df_co2 %>% 
@@ -149,7 +151,7 @@ Fit a linear time trend model to the `co2` series, and examine the characteristi
 
 
 
-```{r, echo = F, fig.height=1.5, fig.width=6}
+```{r, echo = F, fig.height=1.5, fig.width=7}
 #### 2A NORA WORK FROM 3/5
 
 # Fit a linear time trend model
@@ -214,7 +216,8 @@ poly_plot <- df_co2 %>%
   geom_line(aes(x = index, y=fitted(polynomial_model)$.fitted), color = 'blue') + 
   labs(title = "Fitted Polynomial Model",
        x = 'time',
-       y = 'CO2 (ppm)')
+       y = 'CO2 (ppm)') + 
+  scale_x_discrete(guide = guide_axis(check.overlap = TRUE))
 
 grid.arrange(lin_plot, quad_plot, poly_plot, ncol = 3)
 
@@ -223,22 +226,24 @@ grid.arrange(lin_plot, quad_plot, poly_plot, ncol = 3)
 # Generate forecasts to the year 2020
 forecast_polynomial <- forecast(polynomial_model, h = 276)
 # forecast_polynomial %>% ggplot(aes(x = index, y=.mean)) + geom_line()
+```
+```{r, echo=F, fig.height=3, fig.width=6}
+par(mfrow=c(2,3))  
+plot(residuals_linear, main = "Residuals of Linear Model")
+plot(residuals_quadratic, type = "l", main = "Residuals of Quadratic Model")
+plot(residuals_poly,type = "l", main = "Residuals of Polynomial Model")
+acf(residuals_linear)
+acf(residuals_quadratic)
+acf(residuals_poly)
+```
 
+```{r}
 mod_names <- c("linear", "quadratic", "polynomial")
 mod_aic <- c(AIC(linear_model),  glance(quadratic_model)$AIC, glance(polynomial_model)$AIC)
 mod_bic <- c(BIC(linear_model),  glance(quadratic_model)$BIC, glance(polynomial_model)$BIC)
 
 mod_table <- cbind(mod_names, mod_aic, mod_bic)
 mod_table
-```
-```{r, fig.height=3, fig.width=6}
-par(mfrow=c(2,3))  
-plot(residuals_linear, main = "Residuals of Linear Model")
-plot(residuals_quadratic, main = "Residuals of Quadratic Model")
-plot(residuals_poly, main = "Residuals of Polynomial Model")
-acf(residuals_linear)
-acf(residuals_quadratic)
-acf(residuals_poly)
 ```
 
 
@@ -518,6 +523,20 @@ rownames(tab_500) = c('Linear Model', 'Quadratic Model', 'ARIMA Model')
 tab_500
 ```
 
+```{r}
+# 2100 - 1998 = 102*12 + 1 = 1224 + 1 = 1225
+forecast_2100 = forecast(sar_bic, h = 1225)
+predict_2100 <- tail(forecast_2100, n=1)
+point_2100 <- predict_2100$.mean
+
+dist_param = parameters(predict_2100$value)
+ci_2100 <- apply(data.frame(dist_param),1,  predict_int)
+lo_2100 <- ci_2100[1]
+hi_2100 <- ci_2100[2]
+
+paste("Point Estimate: ", round(point_2100, 2))
+paste("95% CI: (", round(lo_2100, 2), ',', round(hi_2100, 2), ')')
+```
 
 # Report from the Point of View of the Present 
 
@@ -830,6 +849,11 @@ plot(sa_pseudo_out_sample, xlab = "Time", ylab = "Forecasted - Actual", main = "
 
 grid.arrange(autoplot(ns_forecast), autoplot(sa_forecast), autoplot(sa_poly_forecast), ncol=3)
 ```
+```{r}
+plot(residuals(poly_trend)$.resid, main = "Residuals Plot")
+glance(poly_trend)$AIC
+AIC(arima_sa)
+```
 
 ## (3 points) Task Part 6b: How bad could it get?
 
@@ -960,6 +984,31 @@ rownames(tab_500) = c('ARIMA (NSA)', 'ARIMA (SA)', 'Polynomial Model')
 tab_500
 ```
 
+```{r}
+# 2122 - 2016 = 106 * 12 = 1272 + 6 + 1 = 1279
+arima_forecast_2122 = forecast(arima_sa, h = 1279)
+arima_predict_2122 <- tail(data.frame(arima_forecast_2122), n=1)
+point_2122 <- arima_predict_2122$Point.Forecast
+
+arima_lo_2122 <- arima_predict_2122$Lo.95
+arima_hi_2122 <- arima_predict_2122$Hi.95
+
+arima_row <- c(paste0((point_2122)), paste("(", arima_lo_2122, ',', arima_hi_2122, ')'))
+
+poly_forecast_2122 = forecast(poly_trend, h = 1279)
+poly_predict_2122 <- tail(poly_forecast_2122, n=1)
+poly_point_2122 <- poly_predict_2122$.mean
+
+dist_param = parameters(poly_predict_2122$value)
+poly_ci_2122 <- apply(data.frame(dist_param),1,  predict_int)
+poly_lo_2122 <- poly_ci_2122[1]
+poly_hi_2122 <- poly_ci_2122[2]
+
+poly_row <- c(paste0((poly_point_2122)), paste("(", poly_lo_2122, ',', poly_hi_2122, ')'))
+
+tab_2122 <- rbind(arima_row, poly_row)
+tab_2122
+```
 
 
 ```{r, echo = F}
