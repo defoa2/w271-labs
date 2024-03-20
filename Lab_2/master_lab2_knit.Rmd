@@ -7,8 +7,6 @@ fontsize: 10pt
 geometry: margin=0.5in
 ---
 
-# The Keeling Curve
-
 ```{r, echo=FALSE}
 # install.packages('blsR')
 # install.packages('psych')
@@ -572,7 +570,7 @@ tab_500
 
 
 ### Predictions for 2100 January
-```{r}
+```{r, echo=FALSE}
 # 2100 - 1998 = 102*12 + 1 = 1224 + 1 = 1225
 forecast_2100 = forecast(sar_bic, h = 1225)
 predict_2100 <- tail(forecast_2100, n=1)
@@ -722,7 +720,7 @@ eda1 <- co2_present_mnth %>%
  
 ```
 
-```{r, echo = F, fig.height=2.5, fig.width=7}
+```{r, echo = F, fig.height=2.5, fig.width=7, message=FALSE}
 #Seasonal Subseries plot 
 eda2 <- co2_present_mnth %>% gg_subseries(value) + 
   labs(
