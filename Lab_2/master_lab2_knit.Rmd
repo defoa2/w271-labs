@@ -95,6 +95,7 @@ co2_separate_components <-components(dcmp) %>% autoplot()
 #| fig.cap = 'Figure 1 - Terrestrial carbon dioxide levels and time series decomposition'
 grid.arrange(components_trend_cycle, co2_separate_components, ncol = 2)
 ```
+
 To analyze the trend year-by-year, Figure 2 provides another angle to view the upward trend in CO2 levels at Mauna Loa. The monthly CO2 (ppm) level was close to 315 ppm in 1959 and increased to upward of 365 ppm at the end of 1997. This is approximately a 16 percent increase in the concentration of CO2 at Mauna Loa across the nearly forty years of observations. 
 
 ```{r, echo = F, fig.height=1.5, fig.width=3}
@@ -119,6 +120,7 @@ eda2 <- df_co2 %>% gg_subseries(value) +
   )
 eda1 | eda2
 ```
+
 Thus far, the data visualizations suggest a non-stationary process with strong seasonal trends. We now turn to lag and ACF plots to gauge possible auto-regressive tendencies in the data. We see strong correlation among the lag values in the lag-lag plot on the left-hand side of Figure 4. The first three month lags are nearly perfectly correlated with the time t $CO_{2}$ levels. From lags four to seven, there is more dispersion in lag correlates, but the linear, positive correlation remains strong. Finally, lags eight and nine realign with time t. The ACF supports a seasonal auto-regressive process. Lags decrease at a slow, but cyclical rate.
 
 ```{r, echo = F, fig.height=2.5, fig.width=6}
@@ -139,7 +141,9 @@ CO2_ACF <- df_co2 %>%
 grid.arrange(CO2_lags, CO2_ACF, ncol = 2)  
 # add histogram maybe?--Not enough room. Really doesn't tell us much about the time series
 ```
+
 The EDA suggests we will need to consider a linear trend along with seasonal variation in the models of the carbon dioxide levels over time. Next, we build time-series models of carbon dioxide fluctuations to break down the seasonal variation and time trend to forecast future $CO_{2}$ accumulation at Mauna Loa. 
+
 
 ##Models
 
@@ -256,6 +260,8 @@ acf(residuals_quadratic)
 acf(residuals_poly)
 ```
 
+The AIC and BIC measurements form the three fitted models indicate the polynomial model has the best fit or makes the best use of the parameters because it has both the lowest AIC and BIC.The plot of the polynomial model results are in the right-side panel of the three panel diagram above. The residual plots below indicate the residuals from the polynomial plot are distributed more precisely around zero. The ACF of residuals was not stationary, but not the seasonal variation of the linear and quadratic models.
+
 Compared to the linear and quadratic models, the polynomial had the strongest performance in both, with significantly lower AIC and BIC
 
 ```{r}
@@ -271,7 +277,6 @@ The forecast until 2020 using the polynomial model had a similar seasonal patter
 
 ```{r, echo = F, message=FALSE, fig.height=1.5, fig.width=3}
 # use polynomial model to forecast to 2020
-par(mfrow=c(1,4)) 
 forecast_polynomial %>%
 autoplot(colour="cornflowerblue") +
 autolayer(df_co2, colour="black") +
@@ -296,7 +301,7 @@ pacf(df_co2$value, main = "PACF")
 hist(df_co2$value, main = "Histogram", xlab = "CO2 (ppm)")
 ```
 
-*Core plot write up*
+
 The time series plot shows an increasing average as time increases. The histogram of Co2 values also shows an non-normal distribution. Both of these point to an increasing trend in the data. The ACF plot shows persistent significant lags, even for very large lag values, this is an attribute of an AR process. Additionally, the PACF plot quickly dies, but maintain an oscillating pattern, which is an attribute of an MA process. All of these factors together point towards an ARIMA process that underlies the Co2 time series that we wish to model.
 
 ```{r model selection, echo = F}
@@ -328,7 +333,7 @@ model.bic %>%
 ```
 
 
-*Model Interpretation*
+
 Model selection across AIC, AICc, and BIC all chose an ARIMA model with 2 AR parameters, 4 MA parameters and linear differencing. However, from looking at the ACF and PACF plots, below there are signs that there are still unaccounted seasonality trends that could be incorporated into the model.
 
 ```{r, echo = F, fig.height=1.5, fig.width=5}
@@ -627,7 +632,7 @@ co2_present_mnth <- co2_present %>%
 
 
 
-```{r, echo = F, fig.height=2.5, fig.width=6}
+```{r, echo = F, fig.height=2.5, fig.width=6, warning=FALSE}
 #Lab Plots 
 co2_pre <- co2_present_mnth %>% 
   gg_lag(value, geom = 'point') + 
@@ -648,7 +653,7 @@ co2_present_mnth <- co2_present_mnth[-c(which(is.na(co2_present_mnth))), ]
 # which(is.na(co2_present_mnth))
 ```
 
-```{r, echo = F, fig.height=3, fig.width=3}
+```{r, echo = F, fig.height=3, fig.width=3, warning=FALSE}
 co2_present_mnth <- na.locf(co2_present_mnth)
 ```
 
@@ -692,6 +697,7 @@ eda2 <- co2_present_mnth %>% gg_subseries(value) +
   )
 eda1 | eda2
 ```
+
 ## (1 point) Task 2b: Compare linear model forecasts against realized CO2
 
 The graphs show that the actual co2 concentration levels are significantly higher than what was forecasted in 1997. According to the linear model, 2023 was forecasted to see levels around 390 ppm, but the actual ppm recorded was about 420. From the residuals of the linear model in the 1997 report we already saw that this model wasn’t a great fit, and this graph confirms it.
@@ -801,10 +807,11 @@ The ARIMA model has a better RMSE than the linear model (8.6), and the residual 
 ## (4 points) Task 5b: Train best models on present data
 
 The residuals plots show that the ARIMA model trained on the seasonally adjusted CO2 data frame performs better than the non-seasonally adjusted data frame (the in-sample residuals stay closer to 0). 
-Analyzing the pseudo/out prediction values, we can see that the seasonally adjusted ARIMA model tends to overestimate CO2 values, while the non-seasonally adjusted model underestimates CO2 values (these plotted values are the forecasted values minus the test set CO2 values). 
+Analyzing the pseudo/out prediction values, we can see that the seasonally adjusted ARIMA model tends to overestimate CO2 values, while the non-seasonally adjusted model underestimates CO2 values.
+From the pseudo/out graph for the seasonally adjusted polynomial model, we see that for the first set time steps are forecasted fairly accurately, but further into the future the model severely underestimates the Co2 concentration with high error.
 The three forecasts for non-seasonally adjusted ARIMA, seasonally adjusted ARIMA, and polynomial model (same model as used in question 4b) show a difference in scale and trend for future predictions. SA ARIMA and NSA ARIMA models are similar, but SA overestimates in comparison to NSA. The polynomial model underestimates in comparison to the other two, and follows a nonlinear trend with significant dips. 
 
-```{r, echo = F, fig.height=2, fig.width=7}
+```{r, echo = F, fig.height=3, fig.width=7.5}
 
 # Seasonally adjust the weekly NOAA data
 sa_noaa_data <- stl(x = ts(co2_present_mnth$value, frequency = 12), s.window = "periodic")
@@ -839,37 +846,42 @@ values_sa_forecast <- sa_forecast$value[is.numeric(sa_forecast$value)]
 ns_pseudo_out_sample <- ns_forecast$mean - sa_test$value
 sa_pseudo_out_sample <- sa_forecast$mean - sa_test$value
 
+
 # # Fit polynomial time-trend model to SA series
 poly_trend <- sa_train %>% model(trend = TSLM(value ~ trend() + I(trend()^2) + I(trend()^3) + season()))
-sa_poly_forecast <- predict(poly_trend, newdata = sa_test)
+sa_poly_forecast <- forecast(poly_trend, h = 104)
 
+poly_pseudo_out_sample <- sa_poly_forecast$.mean - sa_test$value
 # Compare the performance of ARIMA and polynomial time-trend models
-ns_rmse <- sqrt(mean(ns_pseudo_out_sample^2))
+# ns_rmse <- sqrt(mean(ns_pseudo_out_sample^2))
+# 
+# sa_rmse <- sqrt(mean(sa_pseudo_out_sample^2))
+# 
+# poly_rmse <- sqrt(mean((sa_poly_forecast$.mean - sa_test$value)^2))
 
-sa_rmse <- sqrt(mean(sa_pseudo_out_sample^2))
-
-poly_rmse <- sqrt(mean((sa_poly_forecast$.mean - sa_test$value)^2))
-
-print("RMSE for ARIMA model (NSA):")
-print(ns_rmse)
-
-print("RMSE for ARIMA model (SA):")
-print(sa_rmse)
-
-print("RMSE for Polynomial Time-Trend model (SA):")
-print(poly_rmse)
+# print("RMSE for ARIMA model (NSA):")
+# print(ns_rmse)
+# 
+# print("RMSE for ARIMA model (SA):")
+# print(sa_rmse)
+# 
+# print("RMSE for Polynomial Time-Trend model (SA):")
+# print(poly_rmse)
 
 residuals_ns <- residuals(arima_ns)
 
 
 # Plot the residuals ns
-par(mfrow=c(1,4))
+par(mfrow=c(2,3))
 plot(residuals_ns, xlab = "Time", ylab = "Residuals", main = "Residuals Plot")
 
 residuals_sa <- residuals(arima_sa)
 
 # Plot the residuals sa
 plot(residuals_sa, xlab = "Time", ylab = "Residuals", main = "Residuals Plot")
+
+# plot residuals poly
+plot(residuals(poly_trend)$.resid, main = "Residuals Plot")
 
 #out sample
 # Plot the residuals sa out 
@@ -878,13 +890,22 @@ plot(ns_pseudo_out_sample, xlab = "Time", ylab = "Forecasted - Actual", main = "
 #Plot the residuals ns out
 plot(sa_pseudo_out_sample, xlab = "Time", ylab = "Forecasted - Actual", main = "Pseudo/Out Plot SA")
 
-grid.arrange(autoplot(ns_forecast), autoplot(sa_forecast), autoplot(sa_poly_forecast), ncol=3)
+# plot poly pseudo
+plot(poly_pseudo_out_sample, xlab = "Time", type = 'l', ylab = "Forecasted - Actual", main = "Pseudo/Out Plot SA")
+
+poly_forecast_plot <- sa_poly_forecast %>%
+  autoplot(show.legend = FALSE) + 
+  autolayer(sa_train, colour="black")
+grid.arrange(autoplot(ns_forecast), autoplot(sa_forecast), poly_forecast_plot, ncol=3)
 ```
+
 ```{r}
-plot(residuals(poly_trend)$.resid, main = "Residuals Plot")
-glance(poly_trend)$AIC
-AIC(arima_sa)
+models <- c("ARIMA NSA", "ARIMA SA", "Polynomial SA")
+aic <- c(AIC(arima_ns), AIC(arima_sa), glance(poly_trend)$AIC)
+
+cbind(models, aic)
 ```
+
 
 ## (3 points) Task Part 6b: How bad could it get?
 
@@ -1042,6 +1063,11 @@ tab_2122 <- rbind(arima_row, poly_row)
 tab_2122
 ```
 
+# References
+
+Jiménez-de-la-Cuest, Diego and Thorsten Mauritsen. 2019. Emergent constraints on Earth’s transient and equilibrium response to doubled CO2 from post-1970s global warming. Nature Geosciences 12: 902-905. 
+Keeling, Charles D. 1960. The Concentration and Isotopic Abundances of Carbon Dioxide in the Atmosphere. Tellus 12(2)
+United Nations Climate Conference. 2023. Linking Nature Conservation with Climate Action. Retrieved from https://unfccc.int/cop28/5-key-takeaways#protecting-nature
 
 ```{r, echo = F}
 # 
