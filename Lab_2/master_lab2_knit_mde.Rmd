@@ -1,7 +1,6 @@
 ---
-title: "W271 Group Lab"
-subtitle: "Bike share demand"
-author: "Annie DeForge, Hannah Abraham, Mariah Ehmke, Nora Povejsil"
+subtitle: "Manoa CO2 Levels"
+author: "Hannah Abraham, Annie DeForge, Mariah Ehmke, Nora Povejsil"
 output: bookdown::pdf_document2
 fontsize: 10pt
 geometry: margin=0.5in
