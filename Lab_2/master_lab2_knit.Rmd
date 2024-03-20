@@ -151,13 +151,14 @@ grid.arrange(CO2_lags, CO2_ACF, ncol = 2)
 The EDA suggests we will need to consider a linear trend along with seasonal variation in the models of the carbon dioxide levels over time. Next, we build time-series models of carbon dioxide fluctuations to break down the seasonal variation and time trend to forecast future $CO_{2}$ accumulation at Mauna Loa. 
 
 
-##Models
+## Models
 
   We test a series of models to determine the best model to explain carbon dioxide levels and accumulation path at Mauna Loa. The general formulation of the models follows a linear time trend (equation 1), quadratic transformation (equation 2), and polynomial time series model (equation 3). 
   
-$y_{t} = \beta_{0} + \beta_{1}t +\epsilon_{t}$ \t (Equation 1) \
-$y_{t} = \beta_{0} + \beta_{1}t + \beta_{2}t^{2} + \epsilon_{t}$ \t (Equation 2) \
-$y_{t} = \beta_{0} + \beta_{1}t + \beta_{2}t^{2} + \beta_{3}t^{3} + \epsilon_{t}$ \t \
+(Equation 1) $y_{t} = \beta_{0} + \beta_{1}t +\epsilon_{t}$ \
+(Equation 2) $y_{t} = \beta_{0} + \beta_{1}t + \beta_{2}t^{2} + \epsilon_{t}$  \
+(Equation 3) $y_{t} = \beta_{0} + \beta_{1}t + \beta_{2}t^{2} + \beta_{3}t^{3} + \epsilon_{t}$ \
+
 
 where $y_{t}$ is the level of carbon dioxide in time $t$ and $\epsilon_{t}$ is the white noise associated with the series. 
  
@@ -482,6 +483,7 @@ plot <- ggplot()  + geom_line(data = long_forecast_arima, aes(x=index, y = .mean
 plot
 ```
 
+### Point Estimate and CI for 420 ppm
 The ARIMA model predicts that CO2 levels will pass 420 ppm for the first time in May of 2031, and for the last time in October of 2035. As seen in the plot above, the confidence interval grows extremely large and the lower bound of the prediction interval does not exceed 420 even in 2100, so the upper bound of the confidence interval was not findable using the ARIMA model over the time period that we forecasted over. The linear model prediction confidence interval does not have much overlap with the ARIMA CI, but the quadratic model has a decent amount of overlap. Because of the strength of the ARIMA AIC and the fact that there are similar predictions between different models, we can be fairly confident that the real time in which CO2 is within the 95% confidence interval.
 
 ```{r, echo = F}
@@ -525,6 +527,7 @@ tab_420
 
 ```
 
+### Point Estimate and CI for 500 ppm
 The ARIMA model predicts that the CO2 levels will pass 500 ppm for the first time in April of 2083 and for the last time in September of 2087. We can be much less confident in this prediction because the confidence interval is so wide at this point that the margin of error is almost 3 decades, thus we are much less confident in this estimate.
 
 ```{r, echo = F}
@@ -567,6 +570,8 @@ rownames(tab_500) = c('Linear Model', 'Quadratic Model', 'ARIMA Model')
 tab_500
 ```
 
+
+### Predictions for 2100 January
 ```{r}
 # 2100 - 1998 = 102*12 + 1 = 1224 + 1 = 1225
 forecast_2100 = forecast(sar_bic, h = 1225)
@@ -780,7 +785,7 @@ windowed <- co2_present_mnth %>%
   filter_index("1998-1"~ "2023-12")
 ```
 
-#Linear Model Eval
+### Linear Model Eval
 
 ```{r, echo = F}
 lin_fore_acc <- forecast(linear_model, h = 312)
@@ -803,7 +808,7 @@ accuracy(lin_fore_acc, windowed$value)
 # Box.test(residuals_linear, lag = 10, type = "Ljung-Box")
 ```
 
-#ARIMA Model Eval
+### ARIMA Model Eval
 
 ```{r, echo = F}
 forecast_arima_acc  <- forecast(sar_bic, h = 312)
@@ -841,9 +846,12 @@ The ARIMA model has a better RMSE than the linear model (8.6), and the residual 
 
 ## (4 points) Task 5b: Train best models on present data
 
-The residuals plots show that the ARIMA model trained on the seasonally adjusted CO2 data frame performs better than the non-seasonally adjusted data frame (the in-sample residuals stay closer to 0), as it had the lowest AIC compared to the other models. The polynomial AIC was also good compared to the ARIMA NAS. 
+The residuals plots show that the ARIMA model trained on the seasonally adjusted CO2 data frame performs better than the non-seasonally adjusted data frame (the in-sample residuals stay closer to 0), as it had the lowest AIC compared to the other models (see table below). The polynomial AIC was also good compared to the ARIMA NAS. 
+
 Analyzing the pseudo/out prediction values, we can see that the seasonally adjusted ARIMA model tends to overestimate CO2 values, while the non-seasonally adjusted model underestimates CO2 values.
+
 From the pseudo/out graph for the seasonally adjusted polynomial model, we see that for the first set time steps are forecasted fairly accurately, but further into the future the model severely underestimates the Co2 concentration with high error.
+
 The three forecasts for non-seasonally adjusted ARIMA, seasonally adjusted ARIMA, and polynomial model (same model as used in question 4b) show a difference in scale and trend for future predictions. SA ARIMA and NSA ARIMA models are similar, but SA overestimates in comparison to NSA. The polynomial model underestimates in comparison to the other two, and follows a nonlinear trend with significant dips. 
 
 ```{r, echo = F, fig.height=3, fig.width=7.5, warning=FALSE}
@@ -997,6 +1005,7 @@ long_forecast_arima_ns$index <- sa_poly_long$mnth
 long_forecast_arima_sa$index <- sa_poly_long$mnth
 ```
 
+### Point Estimate and CI for 420 ppm
 ```{r, echo = F}
 first_arima_ns_lower <- long_forecast_arima_ns[min(which(long_forecast_arima_ns$Hi.95 > 420 & long_forecast_arima_ns$Hi.95 < 421)), 'index']
 last_arima_ns_lower <- long_forecast_arima_ns[max(which(long_forecast_arima_ns$Hi.95 > 420 & long_forecast_arima_ns$Hi.95 < 421)), 'index']
@@ -1031,11 +1040,11 @@ row_sa_poly <- c(paste0(first_sa_poly_point), paste('(', first_sa_poly_lower, ',
                 paste0(last_sa_poly_point), paste('(', last_sa_poly_lower, ',', last_sa_poly_upper, ')'))
 
 tab_420 <- rbind(row_arima_ns, row_arima_sa, row_sa_poly )
-colnames(tab_420) = c('420: Predicted first time', '95% CI', '420: Predicted last time', '95% CI')
-rownames(tab_420) = c('ARIMA Not Seasonal Adjusted Model', 'ARIMA Seasonally Adjusted Model', 'Polynomial Model')
+colnames(tab_420) = c('Predicted first time', '95% CI', 'Predicted last time', '95% CI')
+rownames(tab_420) = c('ARIMA (NSA)', 'ARIMA (SA)', 'Polynomial Model')
 tab_420
 ```
-
+### Point Estimate and CI for 500 ppm
 ```{r, echo = F}
 # 500 prediction table
 first_arima_ns_lower <- long_forecast_arima_ns[min(which(long_forecast_arima_ns$Hi.95 > 500 & long_forecast_arima_ns$Hi.95 < 501)), 'index']
@@ -1075,7 +1084,7 @@ colnames(tab_500) = c('Predicted first time', '95% CI', 'Predicted last time', '
 rownames(tab_500) = c('ARIMA (NSA)', 'ARIMA (SA)', 'Polynomial Model')
 tab_500
 ```
-
+### Predictions for 2122 January
 ```{r, echo=FALSE}
 # 2122 - 2016 = 106 * 12 = 1272 + 6 + 1 = 1279
 arima_forecast_2122 = forecast(arima_sa, h = 1279)
