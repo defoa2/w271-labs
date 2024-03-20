@@ -45,7 +45,7 @@ knitr::opts_chunk$set(dpi=1000)
 
 ## Introduction 
 
-The most recent UN Climate Conference known as COP28, resulted in international agreement to limit greenhouse gas emissions with the aim of limiting overall planetary global warming to 1.5 degrees Celsius. The plans rely on reducing greenhouse gas emissions from anthropogenic activities and increasing the uptake of carbon dioxide (CO2) from the atmosphere into natural storage systems, such as forests and soils (United Nations Climate Conference, 2023). Global levels of CO2 have more than doubled around the world compared to pre-industrialization levels (Jiménez-de-la-Cuesta and Mauritsen, 2019). This doubling has occurred despite seasonal growth and contractions in CO2 levels, particularly in areas with forests. 
+The most recent UN Climate Conference known as COP28, resulted in international call to limit greenhouse gas emissions to limit overall planetary global warming to 1.5 degrees Celsius. The plans rely on reducing greenhouse gas emissions from anthropogenic activities and increasing the uptake of carbon dioxide (CO2) from the atmosphere into natural storage systems, such as forests and soils (United Nations Climate Conference, 2023). Global levels of CO2 have more than doubled around the world compared to pre-industrialization levels (Jiménez-de-la-Cuesta and Mauritsen, 2019). This doubling has occurred despite seasonal growth and contractions in CO2 levels, particularly in areas with forests. 
 
 Seasonal variation in CO2 levels reflects the terrestrial cycles related to plant growth and decomposition. Keeling (1960) showed atmospheric local seasonal CO2 levels in Mauna Loa, Hawaii peaked right before a new growing season, steadily decreased as plants absorbed CO2 during the growing season, and reached a low at the end of the growing season. Despite these seasonal adjustments, baseline CO2 levels in Hawaii and throughout the world have grown over time. The growth reflects increased emissions from industrial, agricultural, and transportation systems. The goal of the COP28 is to contain CO2 levels through improved forestry and biodiversity management to absorb more CO2 from the atmosphere. 
 
@@ -55,6 +55,7 @@ H01: Atmospheric CO2 concentrations at Mauna Loa, Hawaii follow a linear trend f
 HA1: Atmospheric CO2 concentrations at Mauna Loa, Hawaii follow a non-linear trend from 1957 to 2020.
 
 If the null hypothesis holds, it will provide insight into the rate at which atmospheric CO2 levels would decrease given reductions in CO2 emissions from industrial, agricultural, and transportation technologies. If it the trend is linear, we would expect a proportional decrease in CO2 levels from emission reductions following a reverse linear trend. If it is not linear, then CO2 levels will respond differently to emission caps. We will explore possible growth paths if the null hypothesis is rejected. 
+ 
 
 
 ## CO2 data
@@ -144,12 +145,30 @@ The EDA suggests we will need to consider a linear trend along with seasonal var
 
   We test a series of models to determine the best model to explain carbon dioxide levels and accumulation path at Mauna Loa. The general formulation of the models follows a linear time trend (equation 1), quadratic transformation (equation 2), and polynomial time series model (equation 3). 
   
-  
+$y_{t} = \beta_{0} + \beta_{1}t +\epsilon_{t}$ \t (Equation 1) \
+$y_{t} = \beta_{0} + \beta_{1}t + \beta_{2}t^{2} + \epsilon_{t}$ \t (Equation 2) \
+$y_{t} = \beta_{0} + \beta_{1}t + \beta_{2}t^{2} + \beta_{3}t^{3} + \epsilon_{t}$ \t \
+
+where $y_{t}$ is the level of carbon dioxide in time $t$ and $\epsilon_{t}$ is the white noise associated with the series. 
+ 
 ## Linear time trend model
 
-Fit a linear time trend model to the `co2` series, and examine the characteristics of the residuals. Compare this to a quadratic time trend model. Discuss whether a logarithmic transformation of the data would be appropriate. Fit a polynomial time trend model that incorporates seasonal dummy variables, and use this model to generate forecasts to the year 2020. 
+### Log-Linear Model consideration
+The data has a pretty linear trend with equal variance throughout the data. From the plot, you can see that a log transformation does not help with linearizing the data. Therefore, there is no transformation that is required for this data
 
+```{r, echo = F, fig.height=1.5, fig.width=3}
+# plot showing log transformation
+plot1 <- df_co2 %>%
+  ggplot() + geom_point(aes(x= index, y = value)) +
+  labs(title = "Untransformed Data")
+plot2 <- df_co2 %>%
+  ggplot() + geom_point(aes(x= index, y = log(value))) +
+  labs(title = "Log Transformation Data")
 
+grid.arrange(plot1, plot2, ncol = 2)
+```
+
+The time trend plots for the linear and quadratic models appear smooth compared to the polynomial model. Both the linear and quadratic model have patterns in the residuals and significant lags in the ACF plot; all of this indicates that seasonality has not yet been accounted for. The polynomial residuals appear more like a white noise process, but there are significant lags in ACF which potentially indicate that the series needs to be detrended.
 
 ```{r, echo = F, fig.height=1.5, fig.width=7}
 #### 2A NORA WORK FROM 3/5
@@ -237,6 +256,8 @@ acf(residuals_quadratic)
 acf(residuals_poly)
 ```
 
+Compared to the linear and quadratic models, the polynomial had the strongest performance in both, with significantly lower AIC and BIC
+
 ```{r}
 mod_names <- c("linear", "quadratic", "polynomial")
 mod_aic <- c(AIC(linear_model),  glance(quadratic_model)$AIC, glance(polynomial_model)$AIC)
@@ -246,7 +267,7 @@ mod_table <- cbind(mod_names, mod_aic, mod_bic)
 mod_table
 ```
 
-
+The forecast until 2020 using the polynomial model had a similar seasonal pattern, with a decreasing growth rate as time went on.
 
 ```{r, echo = F, message=FALSE, fig.height=1.5, fig.width=3}
 # use polynomial model to forecast to 2020
@@ -257,20 +278,7 @@ autolayer(df_co2, colour="black") +
 geom_line(data=polynomial_model %>% augment(), aes(index,.fitted,color=.model))
 ```
 
-### Log-Linear Model consideration
-The data has a pretty linear trend with equal variance throughout the data. From the plot, you can see that a log transformation does not help with linearizing the data. Therefore, there is no transformation that is required for this data
 
-```{r, echo = F, fig.height=1.5, fig.width=3}
-# plot showing log transformation
-plot1 <- df_co2 %>%
-  ggplot() + geom_point(aes(x= index, y = value)) +
-  labs(title = "Untransformed Data")
-plot2 <- df_co2 %>%
-  ggplot() + geom_point(aes(x= index, y = log(value))) +
-  labs(title = "Log Transformation Data")
-
-grid.arrange(plot1, plot2, ncol = 2)
-```
 
 
 
@@ -321,7 +329,7 @@ model.bic %>%
 
 
 *Model Interpretation*
-Model selection across AIC, AICc, and BIC all chose an ARIMA model with 2 AR parameters, 4 MA parameters and linear differencing. However, from looking at the ACF and PACF plots, below there is signs that there are still unaccounted seasonality trends that could be incorporated into the model.
+Model selection across AIC, AICc, and BIC all chose an ARIMA model with 2 AR parameters, 4 MA parameters and linear differencing. However, from looking at the ACF and PACF plots, below there are signs that there are still unaccounted seasonality trends that could be incorporated into the model.
 
 ```{r, echo = F, fig.height=1.5, fig.width=5}
 # testing performance of ARIMA(2, 1, 4)
@@ -333,16 +341,19 @@ acf(resid(model.aic)$.resid, main = "ACF")
 pacf(resid(model.aic)$.resid, main = "PACF")
 ```
 
+We built a SARIMA model and did parameter selection using BIC, because BIC is favored for larger datasets, and the dataset that we are training had nearly 500 observations. Using BIC as the model selection, the model included a main and seasonal linear trend, 1 main MA, 1 seasonal MA, and 2 seasonal AR. The seasonal components tended to have high errors compared to the coefficient estimates, while the main MA effect had much higher confidence.
+
 ```{r, echo = F}
 sar_aic <- df_co2 %>% 
   model(ARIMA(value, ic = 'aic')) 
-report (sar_aic)
+# report (sar_aic)
 
 sar_bic <- df_co2 %>% 
   model(ARIMA(value, ic = 'bic')) 
 report (sar_bic)
 ```
 
+Adding in seasonal factors creates a residual plot that resembles a white noise process and an ACF and PACF with no significant lags, indicating that this model is a good fit.
 
 ```{r, echo = F, fig.height=1.5, fig.width=5}
 # testing performance of SARIMA
@@ -355,7 +366,7 @@ pacf(resid(sar_bic)$.resid, main = "PACF")
 ```
 
 
-
+The forecast until 2022 using the ARIMA model continues the seasonal patterns with a linear growth rate.
 
 ```{r, echo = F, fig.height=1.5, fig.width=3, message=FALSE}
 # forecast to the 2022
@@ -369,8 +380,6 @@ geom_line(data=sar_bic %>% augment(), aes(index,.fitted,color=.model))
 
 
 ## (3 points) Task 4a: Forecast atmospheric CO2 growth 
-
-Generate predictions for when atmospheric CO2 is expected to be at [420 ppm](https://research.noaa.gov/article/ArtMID/587/ArticleID/2764/Coronavirus-response-barely-slows-rising-carbon-dioxide) and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2100. How confident are you that these will be accurate predictions?
 
 ```{r, echo = F}
 # add prediction intervals
@@ -426,8 +435,9 @@ long_forecast_linear = data.frame(forecast(linear_model, h = 1500))
 long_forecast_linear$index = yearmonth(row.names(long_forecast_linear))
 ```
 
+The ARIMA model had an AIC of 181 (see model output in section 3a), which was not as low as the polynomial model, but lower than both the linear and quadratic models, which could not account for seasonality. However, the polynomial model does poorly out of sample, as it predicts CO2 levels to peak and then steeply drop off towards negative predictions. Thus the best model for long-term forecasts is the ARIMA model
 
-```{r, echo = F, fig.height=2.5, fig.width=3}
+```{r, echo = F, fig.height=2.5, fig.width=4}
 idx = long_forecast_arima$index
 plot <- ggplot()  + geom_line(data = long_forecast_arima, aes(x=index, y = .mean, color = "ARIMA Model")) +
   geom_ribbon(aes(x = idx, ymax = arima_hi, ymin = arima_lo, fill = "ARIMA Model"), alpha = 0.4, color = NA) +
@@ -437,10 +447,14 @@ plot <- ggplot()  + geom_line(data = long_forecast_arima, aes(x=index, y = .mean
   geom_ribbon(aes(x = idx, ymax = quad_hi, ymin = quad_lo, fill = "Quadratic Model"), alpha = 0.4, color = NA) +
   geom_line(data = long_forecast_linear, aes(x=index, y = Point.Forecast, color = "Linear Model"))  +
   geom_ribbon(data = long_forecast_linear, aes(x=index, ymax = Hi.95, ymin = Lo.95, fill = "Linear Model"), alpha = 0.4, color = NA) + 
-  geom_hline(yintercept = 420) + 
-  geom_hline(yintercept = 500)
+  geom_hline(yintercept = 420, label = "500") + 
+  geom_hline(yintercept = 500, label = "420") + 
+  geom_text(aes( 0, 420, label = 420, vjust = -1), size = 3) + 
+  geom_text(aes( 0, 500, label = 500, vjust = -1), size = 3)
 plot
 ```
+
+The ARIMA model predicts that CO2 levels will pass 420 ppm for the first time in May of 2031, and for the last time in October of 2035. As seen in the plot above, the confidence interval grows extremely large and the lower bound of the prediction interval does not exceed 420 even in 2100, so the upper bound of the confidence interval was not findable using the ARIMA model over the time period that we forecasted over. The linear model prediction confidence interval does not have much overlap with the ARIMA CI, but the quadratic model has a decent amount of overlap. Because of the strength of the ARIMA AIC and the fact that there are similar predictions between different models, we can be fairly confident that the real time in which CO2 is within the 95% confidence interval.
 
 ```{r, echo = F}
 first_lin_lower <- long_forecast_linear[min(which(long_forecast_linear$Hi.95 > 420 & long_forecast_linear$Hi.95 < 421)), 'index']
@@ -482,6 +496,8 @@ rownames(tab_420) = c('Linear Model', 'Quadratic Model', 'ARIMA Model')
 tab_420
 
 ```
+
+The ARIMA model predicts that the CO2 levels will pass 500 ppm for the first time in April of 2083 and for the last time in September of 2087. We can be much less confident in this prediction because the confidence interval is so wide at this point that the margin of error is almost 3 decades, thus we are much less confident in this estimate.
 
 ```{r, echo = F}
 first_lin_lower <- long_forecast_linear[min(which(long_forecast_linear$Hi.95 >500 & long_forecast_linear$Hi.95 < 501)), 'index']
@@ -538,23 +554,27 @@ paste("Point Estimate: ", round(point_2100, 2))
 paste("95% CI: (", round(lo_2100, 2), ',', round(hi_2100, 2), ')')
 ```
 
+We estimated the predicted CO2 levels in January of 2100. The ARIMA model predicted 524 ppm and we are 95% confident that the true value is between 399 and 648 ppm. This is very far in the future and the confidence interval is very large so it is hard to have much confidence in these predictions.
+
 # Report from the Point of View of the Present 
 
 ## (1 point) Task 0b: Introduction 
-
+In 2024, we now have access to an additional 26 years of co2 concentration data. The data from the 1997 report was collected by the Scripps Institution at the Mauna Loa Observatory, Hawaii. This report will use co2 concentration data collected by NOAA from 1997 to 2024. The data presented in this report and the 1997 report were both collected at 3400m in Mauna Loa with samples from stations in the northern subtropics. The collection of the data is relatively consistent over the 66 years of observations. The rest of this report will analyze if forecasts of co2 concentration were accurate based on the data available in 1997, and if error is due to the models or other factors. Over the past 20 years, the world population has increased by 2 billion, and we’ve been burning more fossil fuels than ever to keep up with energy demands. These circumstances that aren’t accounted for in the 1997 model might explain some of the error we will see in previous forecasts.
 
 ## (3 points) Task 1b: Create a modern data pipeline for Mona Loa CO2 data.
-
-```{r, echo = F, message=FALSE}
-# download and use the CSV
-
+```{r pipeline, echo=FALSE}
+# download and save the file locally as a CSV
 # weekly data url
 # weekly_url <- 'https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_weekly_mlo.txt'
 # # download file into weekly csv
 # download.file(weekly_url, "weekly.csv")
+```
+
+We created a pipeline which connected to the NOAA data portal and pulled down the data and locally saved the file with more recent data.
+```{r, echo = F, message=FALSE}
 # create headings
 headings = c("year", "month", "day", "decimal", "average", "ndays", "1_yr_ago", "10_yrs_ago", "increase_since_1800")
-# read into and format dataframe
+# read into from downloaded URL and format dataframe
 new_co2_w<- read.table("weekly.csv", header=FALSE, quote="\"", stringsAsFactors=TRUE)
 colnames(new_co2_w) <- headings
 
@@ -570,6 +590,7 @@ co2_present <- new_co2_w %>%
 co2_present[co2_present == -999.99] = NA
 ```
 
+Compared to the keeling curve in 1997, the NOAA data shows a similar consistent seasonal trend, but the values are increasing rapidly. The NOAA data shows a steeper incline in co2 concentration. The Keeling curve from 1958-1997 (39 years) shows a roughly 40 ppm increase overall, while the Keeling curve from 1997-2023 (26 years) shows around a 90 ppm increase.The ACF, STL decomposition, and lag plots look similar to the 1958-1997 observations. The ACF’s persistent significant lags and the oscillation in the PACF plot continue to show traits of both AR and MA processes, just as it did in 1997. These comparison of the present data timeplot and the 1997 timeplot reveal a possible non-linear trend in co2 which could mean our linear model from 1997 will perform poorly.
 
 ```{r, echo = F, fig.height=1.75, fig.width=1.75}
 co2_present %>%
@@ -673,7 +694,7 @@ eda1 | eda2
 ```
 ## (1 point) Task 2b: Compare linear model forecasts against realized CO2
 
-Descriptively compare realized atmospheric CO2 levels to those predicted by your forecast from a linear time model in 1997 (i.e. "Task 2a"). (You do not need to run any formal tests for this task.) 
+The graphs show that the actual co2 concentration levels are significantly higher than what was forecasted in 1997. According to the linear model, 2023 was forecasted to see levels around 390 ppm, but the actual ppm recorded was about 420. From the residuals of the linear model in the 1997 report we already saw that this model wasn’t a great fit, and this graph confirms it.
 
 ```{r, echo = F, fig.height=1.5, fig.width=3}
 lin_forecast <- forecast(linear_model, h=312)
@@ -697,6 +718,8 @@ comp_plot
 
 
 ## (1 point) Task 3b: Compare ARIMA models forecasts against realized CO2  
+
+The ARIMA model did a better job at forecasting than the linear model, but it still has a tendency to underestimate the co2 levels. The correct co2 concentrations are included in the upper end of the 95% confidence interval of the ARIMA forecast. The Keeling curve had a greater rate of change than anticipated.
 
 ```{r, echo = F, fig.height=1.5, fig.width=3}
 comp_plot <- forecast_arima %>%
@@ -731,12 +754,12 @@ accuracy(lin_fore_acc, windowed$value)
 ```
 
 ```{r, echo = F, fig.height=2, fig.width=2}
-checkresiduals(linear_model)
+# checkresiduals(linear_model)
 ```
 
 ```{r, echo = F}
-residuals_linear <- residuals(linear_model)
-Box.test(residuals_linear, lag = 10, type = "Ljung-Box")
+# residuals_linear <- residuals(linear_model)
+# Box.test(residuals_linear, lag = 10, type = "Ljung-Box")
 ```
 
 #ARIMA Model Eval
@@ -750,28 +773,36 @@ accuracy(forecast_arima_acc$.mean, windowed$value)
 ```{r, echo = F, fig.height=1, fig.width=2}
 #residuals arima
 
-sar_bic %>%
-  augment() %>%
-  ACF(.resid) %>%
-  autoplot()
+# sar_bic %>%
+#   augment() %>%
+#   ACF(.resid) %>%
+#   autoplot()
 
 ```
 
+It was forecasted by the ARIMA model that we would reach 420 ppm in May 2031, and the linear model forecasted we’d reach 420 ppm in December 2041. However we crossed the 420 ppm threshold in February 2023. Our models seemed to be far from the truth since they didn’t account for the quickly increasing rate of change of the Keeling curve.
+
+From looking at the linear model residual plot from the 1997 report, we see that the residuals aren’t white noise. This tells us that the model wasn’t a good fit for the data. From the accuracy test we see that the RMSE is roughly 14.6 which shows there is substantial error.
+
+The ARIMA model has a better RMSE than the linear model (8.6), and the residual plot from the 1997 report showed that the residuals were white noise. This means the ARIMA model is a better fit for representing present co2 concentration levels. The plot in 3b also shows that the correct co2 concentrations were included in the 95% confidence interval of the ARIMA forecast, which shows that the ARIMA was close to learning the correct trend and seasonality.
 
 ```{r, echo = F, fig.height=3, fig.width=3}
 #box test arima 
 
-resid.sar <- sar_bic %>%
-  augment() %>%
-  dplyr::select(.resid) %>%
-  as.ts()
-
-Box.test(resid.sar, lag = 10, type = "Ljung-Box")
+# resid.sar <- sar_bic %>%
+#   augment() %>%
+#   dplyr::select(.resid) %>%
+#   as.ts()
+# 
+# Box.test(resid.sar, lag = 10, type = "Ljung-Box")
 ```
 
 
 ## (4 points) Task 5b: Train best models on present data
 
+The residuals plots show that the ARIMA model trained on the seasonally adjusted CO2 data frame performs better than the non-seasonally adjusted data frame (the in-sample residuals stay closer to 0). 
+Analyzing the pseudo/out prediction values, we can see that the seasonally adjusted ARIMA model tends to overestimate CO2 values, while the non-seasonally adjusted model underestimates CO2 values (these plotted values are the forecasted values minus the test set CO2 values). 
+The three forecasts for non-seasonally adjusted ARIMA, seasonally adjusted ARIMA, and polynomial model (same model as used in question 4b) show a difference in scale and trend for future predictions. SA ARIMA and NSA ARIMA models are similar, but SA overestimates in comparison to NSA. The polynomial model underestimates in comparison to the other two, and follows a nonlinear trend with significant dips. 
 
 ```{r, echo = F, fig.height=2, fig.width=7}
 
@@ -857,6 +888,7 @@ AIC(arima_sa)
 
 ## (3 points) Task Part 6b: How bad could it get?
 
+Using the non-seasonally adjusted data series, the first time CO2 is expected to be at 420 ppm is October 2026 (with the interval October 2023 - March 2030) and to be 500 ppm in January 2073 for the first time (with the interval April 2068-March 2078). In the year 2122, CO2 is expected to be 747.21 from the seasonally adjusted ARIMA model predictions with the 95% confidence interval -2058.8 to 3553.26. The polynomial model forecasts that in the year 2122 we will reach 1406.12 ppm with the 95% confidence interval 1319.66 to 1492.58. We are not entirely confident in these predictions being accurate, since there is variability in the models, as well as many factors that may speed up or slow down CO2 concentration trends in the next 100 years besides seasonal patterns. It also seems that the confidence intervals are very large for co2 concentration predictions, which might indicate that it is hard to accurately forecast based on the current data.
 
 ```{r, echo = F}
 # ns_forecast
