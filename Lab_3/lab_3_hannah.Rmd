@@ -49,6 +49,7 @@ data
 ```
 
 ```{r}
+
 data_piv <- data %>%
   pivot_longer(
     cols = starts_with("d"),
@@ -64,6 +65,15 @@ data_piv <- data_piv %>%
     cols = starts_with("bac"),
     names_to = "blood_alc",
     names_prefix = "bac"
+  ) %>% 
+  filter(value == 1) %>% 
+  select(-value)
+
+data_piv <- data_piv %>%
+  pivot_longer(
+    cols = starts_with("sl"),
+    names_to = "speed_limit",
+    names_prefix = "sl"
   ) %>% 
   filter(value == 1) %>% 
   select(-value)
