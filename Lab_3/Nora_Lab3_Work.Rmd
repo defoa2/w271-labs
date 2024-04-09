@@ -1,0 +1,86 @@
+---
+title: "lab 3"
+output: pdf_document
+date: "2024-04-08"
+---
+```{r}
+install.packages('blsR')
+install.packages('psych')
+install.packages('imputeTS')
+install.packages('forecast')
+```
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(patchwork)
+library(tsibble)
+library(latex2exp)
+library(lubridate)
+library(blsR)
+library(psych)
+library(feasts)
+library(forecast)
+library(fable)
+library(gridExtra)
+library(readr)
+library(distributional)
+library(reshape2)
+library(imputeTS)
+theme_set(theme_minimal())
+knitr::opts_chunk$set(dpi=1000)
+
+```
+
+## 1. Traffic Data
+```{r}
+data <- load('driving.RData')
+```
+
+```{r}
+names(data)
+```
+
+
+## 2. Build and Describe the Data 
+```{r}
+# Produce new variables
+data$speed_limit <- rowSums(data[, c("sl55", "sl65", "sl70", "sl75", "slnone")])
+
+data$year_of_observation <- as.integer(substring(names(data)[grep("^d", names(data))], 2))
+
+# One-hot encode variables
+bac_one_hot <- model.matrix(~ d80 + d81 + d82 + d83 + d84 + d85 + d86 + d87 + d88 + d89 + d90 + d91 + d92 + d93 + d94 + d95 + d96 + d97 + d98 + d99 + d00 + d01 + d02 + d03 + d04 - 1, data = data)
+
+
+# Combine one-hot encoded variables with original data
+data <- cbind(data, bac_one_hot)
+
+# Rename variables
+colnames(data) <- gsub("d", "drunk_driving_", colnames(data))
+colnames(data) <- gsub("st_", "speed_limit_", colnames(data))
+colnames(data) <- gsub("bfr", "blood_alcohol_", colnames(data))
+colnames(data) <- gsub("p_", "per_se_", colnames(data))
+colnames(data) <- gsub("s_", "seat_belt_", colnames(data))
+colnames(data) <- gsub("gdl_", "graduated_drivers_", colnames(data))
+
+# Renaming dependent variable
+colnames(data)[colnames(data) == "totfatrte"] <- "total_fatalities_rate"
+
+```
+
+
+## 3. Preliminary Model 
+```{r}
+
+
+
+```
+
+## 4. Expanded Model 
+```{r}
+
+
+
+```
+
+
