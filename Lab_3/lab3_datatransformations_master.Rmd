@@ -1,0 +1,467 @@
+---
+title: 'Lab 3: Panel Models'
+subtitle: 'US Traffic Fatalities: 1980 - 2004'
+output: 
+  bookdown::pdf_document2: default
+---
+
+```{r load packages, echo=FALSE, message=FALSE}
+library(tidyverse)
+```
+
+
+# U.S. traffic fatalities: 1980-2004
+
+In this lab, we are asking you to answer the following **causal** question: 
+
+> **"Do changes in traffic laws affect traffic fatalities?"**  
+
+To answer this question, please complete the tasks specified below using the data provided in `data/driving.Rdata`. This data includes 25 years of data that cover changes in various state drunk driving, seat belt, and speed limit laws. 
+
+Specifically, this data set contains data for the 48 continental U.S. states from 1980 through 2004. Various driving laws are indicated in the data set, such as the alcohol level at which drivers are considered legally intoxicated. There are also indicators for “per se” laws—where licenses can be revoked without a trial—and seat belt laws. A few economics and demographic variables are also included. The description of the each of the variables in the dataset is also provided in the dataset. 
+
+```{r load data, echo = TRUE}
+load(file="driving.RData")
+
+## please comment these calls in your work 
+glimpse(data)
+desc
+```
+
+
+# (30 points, total) Build and Describe the Data 
+
+1. (5 points) Load the data and produce useful features. Specifically: 
+    - Produce a new variable, called `speed_limit` that re-encodes the data that is in `sl55`, `sl65`, `sl70`, `sl75`, and `slnone`; 
+    - Produce a new variable, called `year_of_observation` that re-encodes the data that is in `d80`, `d81`, ... , `d04`. 
+    - Produce a new variable for each of the other variables that are one-hot encoded (i.e. `bac*` variable series). 
+    - Rename these variables to sensible names that are legible to a reader of your analysis. For example, the dependent variable as provided is called, `totfatrte`. Pick something more sensible, like, `total_fatalities_rate`. There are few enough of these variables to change, that you should change them for all the variables in the data. (You will thank yourself later.)
+2. (5 points) Provide a description of the basic structure of the dataset. What is this data? How, where, and when is it collected? Is the data generated through a survey or some other method? Is the data that is presented a sample from the population, or is it a *census* that represents the entire population? Minimally, this should include:
+    - How is the our dependent variable of interest `total_fatalities_rate` defined? 
+3. (20 points) Conduct a very thorough EDA, which should include both graphical and tabular techniques, on the dataset, including both the dependent variable `total_fatalities_rate` and the potential explanatory variables. Minimally, this should include: 
+    - How is the our dependent variable of interest `total_fatalities_rate` defined? 
+    - What is the average of `total_fatalities_rate` in each of the years in the time period covered in this dataset? 
+
+As with every EDA this semester, the goal of this EDA is not to document your own process of discovery -- save that for an exploration notebook -- but instead it is to bring a reader that is new to the data to a full understanding of the important features of your data as quickly as possible. In order to do this, your EDA should include a detailed, orderly narrative description of what you want your reader to know. Do not include any output -- tables, plots, or statistics -- that you do not intend to write about.
+
+```{r}
+
+
+# speed limit column
+data$speed_limit <- ifelse(data$sl55 >0, '55', NA)
+data$speed_limit <- ifelse(data$sl65 > 0, '65', data$speed_limit)
+data$speed_limit <- ifelse(data$sl70 > 0, '70', data$speed_limit)
+data$speed_limit <- ifelse(data$sl75 > 0, '75', data$speed_limit)
+data$speed_limit <- ifelse(data$slnone > 0, 'None', data$speed_limit)
+
+
+
+
+col_num <- 31:55
+years <- 1980:2004
+
+year_of_observation <- rep(NA, 1200)
+
+data$year_test <- year_of_observation
+
+
+
+for (i in 1:25){
+ data$year_test <- ifelse(data[, col_num[i]]== 1, years[i], data$year_test)
+}
+
+
+data$bac <- ifelse(data$bac08 == 1, "0.08", NA)
+data$bac <- ifelse(data$bac10 ==1, "0.1", data$bac)
+
+data$total_fatalities_rate <- data$totfatrte
+data$night_fatalities_rate <- data$nghtfatrte
+data$weekend_fatalities_rate <- data$wkndfatrte
+data <- data %>%
+  select(-totfatrte, -nghtfatrte, -wkndfatrte)
+data
+```
+
+
+
+
+
+```{r}
+hist(data$total_fatalities_rate)
+hist((log(data$total_fatalities_rate)))
+```
+```{r}
+hist(data$perc14_24)
+hist((log(data$perc14_24)))
+```
+```{r}
+hist(data$vehicmilespc)
+hist((log(data$vehicmilespc)))
+```
+```{r}
+hist(data$unem)
+hist((log(data$unem)))
+```
+
+```{r}
+#working on using this for plots
+state_abbreviations <- c("AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", 
+                         "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD", 
+                         "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", 
+                         "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", 
+                         "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY")
+
+# Create a dataframe to map state numbers to abbreviations
+state_df <- data.frame(abb = state_abbreviations,
+                       state = 1:length(state_abbreviations))
+
+# Merge to get state abbreviations
+data <- merge(data, state_df, by = "state", all.x = TRUE)
+
+head(data)
+```
+
+
+
+
+```{r}
+p2<- data %>%
+  filter(as.integer(state) <= 12 ) %>%
+  ggplot(aes(x = year, y = log(total_fatalities_rate))) +
+  geom_line(aes(color = as.character(state))) +
+  labs(x = "Year",  y = "Log of Fatality rate")+
+  geom_label_repel(data = filter(data, as.integer(state) <= 12  & year == 1984),
+                   aes(label = state), nudge_x = .75,na.rm = TRUE) +
+  theme(legend.position = "none")
+
+
+p3<- data %>%
+   filter(as.integer(state) > 12 & as.integer(state) <= 24 ) %>%
+  ggplot(aes(x = year, y = log(total_fatalities_rate))) +
+  geom_line(aes(color = as.character(state))) +
+  labs(x = "Year",  y = "Log of Fatality rate")+
+  geom_label_repel(data = filter(data, as.integer(state) > 12 & as.integer(state) <= 24  & year == 1984),
+                   aes(label = state), nudge_x = .75,na.rm = TRUE) +
+  theme(legend.position = "none")
+
+p4<- data %>%
+  filter(as.integer(state) > 24 &as.integer(state) <= 36 ) %>%
+  ggplot(aes(x = year, y = log(total_fatalities_rate))) +
+  geom_line(aes(color = as.character(state))) +
+  labs(x = "Year",  y = "Log of Fatality rate")+
+  geom_label_repel(data = filter(data, as.integer(state) > 24 &as.integer(state) <= 36 & year == 1984),
+                   aes(label = state), nudge_x = .75,na.rm = TRUE) +
+  theme(legend.position = "none")
+
+p5<- data %>%
+  filter(as.integer(state) > 36 ) %>%
+  ggplot(aes(x = year, y = log(total_fatalities_rate))) +
+  geom_line(aes(color = as.character(state))) +
+  labs(x = "Year",  y = "Log of Fatality rate") +
+  geom_label_repel(data = filter(data, as.integer(state) > 36 & year == 1984),aes(label = state),
+                   nudge_x = .75,na.rm = TRUE) +
+  theme(legend.position = "none")
+
+grid.arrange(p2,p3,p4, p5, nrow = 2, ncol = 2)
+```
+
+
+
+```{r}
+data %>%
+  group_by(year) %>%
+  ggplot(aes(x = year, y = log(total_fatalities_rate), group = year)) +
+  geom_boxplot() +
+  labs(x = "Year",  y = "Log of Fatality rate")
+
+data %>%
+  group_by(year) %>%
+  ggplot(aes(x = year, y = log(data$vehicmilespc), group = year)) +
+  geom_boxplot() +
+  labs(x = "Year",  y = "Log of Vehicle miles driven per capita")
+```
+
+
+```{r}
+data %>%
+  data.frame() %>%
+  ggplot(aes(x = reorder(state,log(total_fatalities_rate)), y = log(total_fatalities_rate), group=state)) +
+  geom_boxplot() +
+  labs(x = "States",  y = "Log of Fatality rate") + theme(axis.text.x = element_text(angle=35))+ theme(plot.title = element_text(size=5))
+data %>%
+  group_by(state) %>%
+  ggplot(aes(x = reorder(state,log(vehicmilespc)), y = log(vehicmilespc))) +
+  geom_boxplot() +
+  labs(x = "States",  y = "Log of Vehicle miles driven per capita") + theme(axis.text.x = element_text(angle=35))+ theme(plot.title = element_text(size=5))
+```
+
+
+```{r}
+p1<- ggplot(data = data, aes(x = year, y = log(total_fatalities_rate))) +
+  geom_line() +
+  labs(x = "Year",  y = "Log of Fatality Rate") +
+  theme(legend.position = "none")
+
+p1
+```
+```{r}
+p10<- data %>%
+  filter(as.integer(state) <= 12 ) %>%
+  ggplot(aes(x = year, y = log(unem))) +
+  geom_line(aes(color = as.character(state))) +
+  labs(x = "Year",  y = "Log of Unemployement Rate")+
+  geom_label_repel(data = filter(data, as.integer(state) <= 12  & year == 1984),
+                   aes(label = state), nudge_x = .75,na.rm = TRUE) +
+  theme(legend.position = "none")
+
+p11<-data %>%
+   filter(as.integer(state) > 12 & as.integer(state) <= 24 ) %>%
+  ggplot(aes(x = year, y = log(unem))) +
+  geom_line(aes(color = as.character(state))) +
+  labs(x = "Year",  y = "Log of Unemployement Rate")+
+  geom_label_repel(data = filter(data, as.integer(state) > 12 & as.integer(state) <= 24  & year == 1984),
+                   aes(label = state), nudge_x = .75,na.rm = TRUE) +
+  theme(legend.position = "none")
+
+p12<- data %>%
+  filter(as.integer(state) > 24 &as.integer(state) <= 36 ) %>%
+  ggplot(aes(x = year, y = log(unem))) +
+  geom_line(aes(color = as.character(state))) +
+  labs(x = "Year",  y = "Log of Unemployement Rate")+
+  geom_label_repel(data = filter(data, as.integer(state) > 24 &as.integer(state) <= 36 & year == 1984),
+                   aes(label = state), nudge_x = .75,na.rm = TRUE) +
+  theme(legend.position = "none")
+
+p13<- data %>%
+  filter(as.integer(state) > 36 ) %>%
+  ggplot(aes(x = year, y = log(unem))) +
+  geom_line(aes(color = as.character(state))) +
+  labs(x = "Year",  y = "Log of Unemployement Rate") +
+  geom_label_repel(data = filter(data, as.integer(state) > 36 & year == 1984),aes(label = state), nudge_x = .75,na.rm = TRUE) +
+  theme(legend.position = "none")
+
+grid.arrange(p10,p11,p12, p13, nrow = 2, ncol = 2)
+```
+
+
+
+
+# (15 points) Preliminary Model
+
+Estimate a linear regression model of *totfatrte* on a set of dummy variables for the years 1981 through 2004 and interpret what you observe. In this section, you should address the following tasks: 
+
+- Why is fitting a linear model a sensible starting place? 
+- What does this model explain, and what do you find in this model? 
+- Did driving become safer over this period? Please provide a detailed explanation.
+- What, if any, are the limitation of this model. In answering this, please consider **at least**: 
+    - Are the parameter estimates reliable, unbiased estimates of the truth? Or, are they biased due to the way that the data is structured?
+    - Are the uncertainty estimate reliable, unbiased estimates of sampling based variability? Or, are they biased due to the way that the data is structured? 
+    
+```{r}
+data$year_test_fac <- factor(data$year_test)
+linear_mod <- lm(log(total_fatalities_rate)~year_test_fac, data = data)
+summary(linear_mod)
+```
+
+
+# (15 points) Expanded Model 
+
+Expand the **Preliminary Model** by adding variables related to the following concepts: 
+
+- Blood alcohol levels 
+- Per se laws
+- Primary seat belt laws (Note that if a law was enacted sometime within a year the fraction of the year is recorded in place of the zero-one indicator.)
+- Secondary seat belt laws 
+- Speed limits faster than 70 
+- Graduated drivers licenses 
+- Percent of the population between 14 and 24 years old
+- Unemployment rate
+- Vehicle miles driven per capita. 
+
+If it is appropriate, include transformations of these variables. Please carefully explain carefully your rationale, which should be based on your EDA, behind any transformation you made. If no transformation is made, explain why transformation is not needed. 
+
+- How are the blood alcohol variables defined? Interpret the coefficients that you estimate for this concept. 
+- Do *per se laws* have a negative effect on the fatality rate? 
+- Does having a primary seat belt law? 
+
+```{r}
+expanded_mod <- lm(log(total_fatalities_rate)~year_test_fac + bac + perse + sbprim + sbsecon + gdl + perc14_24 + log(unem) + log(vehicmilespc), data = data)
+summary(expanded_mod)
+```
+
+
+# (15 points) State-Level Fixed Effects 
+
+Re-estimate the **Expanded Model** using fixed effects at the state level. 
+
+- What do you estimate for coefficients on the blood alcohol variables? How do the coefficients on the blood alcohol variables change, if at all? 
+- What do you estimate for coefficients on per se laws? How do the coefficients on per se laws change, if at all? 
+- What do you estimate for coefficients on primary seat-belt laws? How do the coefficients on primary seatbelt laws change, if at all? 
+
+Which set of estimates do you think is more reliable? Why do you think this? 
+
+- What assumptions are needed in each of these models?  
+- Are these assumptions reasonable in the current context?
+
+```{r}
+within_model<- plm(log(total_fatalities_rate)~year_test_fac + bac + perse + sbprim + sbsecon + gdl + perc14_24 + log(unem) + log(vehicmilespc),
+                   data = data,
+                   index = c("state", "year_test_fac"), 
+                   effect = "individual", model = "within")
+
+summary(within_model)
+```
+
+
+# (10 points) Consider a Random Effects Model 
+
+Instead of estimating a fixed effects model, should you have estimated a random effects model?
+
+- Please state the assumptions of a random effects model, and evaluate whether these assumptions are met in the data. 
+- If the assumptions are, in fact, met in the data, then estimate a random effects model and interpret the coefficients of this model. Comment on how, if at all, the estimates from this model have changed compared to the fixed effects model. 
+- If the assumptions are **not** met, then do not estimate the data. But, also comment on what the consequences would be if you were to *inappropriately* estimate a random effects model. Would your coefficient estimates be biased or not? Would your standard error estimates be biased or not? Or, would there be some other problem that might arise?
+
+```{r}
+data
+```
+
+
+```{r}
+
+re.model <- plm(log(total_fatalities_rate)~year_test_fac + bac + perse + sbprim + sbsecon + gdl + perc14_24 + log(unem) + log(vehicmilespc),
+                   data = data,
+                index = c("state", "year_test_fac"), model = "random", random.method = "walhus")
+summary(re.model)
+```
+
+
+# (10 points) Model Forecasts 
+
+The COVID-19 pandemic dramatically changed patterns of driving. Find data (and include this data in your analysis, here) that includes some measure of vehicle miles driven in the US. Your data should at least cover the period from January 2018 to as current as possible. With this data, produce the following statements: 
+
+- Comparing monthly miles driven in 2018 to the same months during the pandemic: 
+  - What month demonstrated the largest decrease in driving? How much, in percentage terms, lower was this driving? 
+  - What month demonstrated the largest increase in driving? How much, in percentage terms, higher was this driving? 
+  
+Now, use these changes in driving to make forecasts from your models. 
+
+- Suppose that the number of miles driven per capita, increased by as much as the COVID boom. Using the FE estimates, what would the consequences be on the number of traffic fatalities? Please interpret the estimate.
+- Suppose that the number of miles driven per capita, decreased by as much as the COVID bust. Using the FE estimates, what would the consequences be on the number of traffic fatalities? Please interpret the estimate.
+
+```{r}
+miles_data <- read.csv('miles_driven.csv')
+head(miles_data)
+```
+```{r}
+miles_data$miles <- miles_data$M12MTVUSM227NFWA
+miles_data <- na.omit(miles_data)
+miles_data$DATE <- as.Date(miles_data$DATE)
+head(miles_data) 
+```
+
+```{r}
+# Extracting data for 2018 and pandemic period
+miles_2018 <- subset(miles_data, year(DATE) == 2018)
+
+miles_pandemic <- subset(miles_data, year(DATE) >= 2020)
+
+# Finding corresponding months in 2018 for each month in the pandemic period
+corresponding_months_2018 <- as.Date(paste("2018", format(miles_pandemic$DATE, "%m"), "01", sep = "-"))
+
+# Extracting miles driven for corresponding months in 2018
+miles_2018_corresponding <- miles_2018[miles_2018$DATE %in% corresponding_months_2018, ]
+```
+
+
+```{r}
+
+head(miles_pandemic)
+```
+
+
+```{r}
+# Merging monthly miles data for 2018 and pandemic period
+# Extract month from DATE column
+miles_2018_corresponding$month <- format(miles_2018_corresponding$DATE, "%m")
+miles_pandemic$month <- format(miles_pandemic$DATE, "%m")
+
+# Merge by month
+merged_miles <- merge(miles_2018_corresponding, miles_pandemic, by = "month", suffixes = c("_2018", "_pandemic"))
+
+head(merged_miles)
+```
+
+
+```{r}
+# Calculating percentage change in monthly miles driven
+merged_miles$percentage_change <- ((merged_miles$miles_pandemic - merged_miles$miles_2018) / merged_miles$miles_2018) * 100
+
+# Month with largest decrease in driving
+max_decrease_month <- merged_miles[which.min(merged_miles$percentage_change), ]
+max_decrease_month
+
+# Month with largest increase in driving
+max_increase_month <- merged_miles[which.max(merged_miles$percentage_change), ]
+```
+
+
+```{r}
+
+# Month with largest decrease in driving during the pandemic
+max_decrease_month_pandemic <- merged_miles[which.min(merged_miles$percentage_change), "DATE_pandemic"]
+
+# Month with largest increase in driving during the pandemic
+max_increase_month_pandemic <- merged_miles[which.max(merged_miles$percentage_change), "DATE_pandemic"]
+
+# Output results
+cat("Month with largest decrease in driving during the pandemic:", format(max_decrease_month_pandemic, "%B %Y"), "\n")
+cat("Percentage decrease:", round(min(merged_miles$percentage_change), 2), "%\n\n")
+
+cat("Month with largest increase in driving during the pandemic:", format(max_increase_month_pandemic, "%B %Y"), "\n")
+cat("Percentage increase:", round(max(merged_miles$percentage_change), 2), "%\n\n")
+
+```
+
+```{r}
+
+# Print the summary of the fixed effects model
+summary(within_model)
+
+# Get the Fixed Effects estimate
+fe_estimate <- coef(within_model)["vehicmilespc"]
+
+# Maximum increase and decrease in miles driven during the pandemic
+max_increase_percentage <- max(merged_miles$percentage_change)
+max_decrease_percentage <- min(merged_miles$percentage_change)
+
+# Calculate the estimated increase in traffic fatalities during the COVID boom
+fatalities_increase_boom <- fe_estimate * (max_increase_percentage / 100)
+
+# Interpret the estimate for the COVID boom
+cat("Estimated increase in traffic fatalities during the COVID boom:", fatalities_increase_boom, "\n")
+
+# Calculate the estimated decrease in traffic fatalities during the COVID bust
+fatalities_decrease_bust <- fe_estimate * (max_decrease_percentage / 100)
+
+# Interpret the estimate for the COVID bust
+cat("Estimated decrease in traffic fatalities during the COVID bust:", fatalities_decrease_bust, "\n")
+
+```
+
+# (5 points) Evaluate Error 
+
+If there were serial correlation or heteroskedasticity in the idiosyncratic errors of the model, what would be the consequences on the estimators and their standard errors? Is there any serial correlation or heteroskedasticity? 
+
+```{r}
+
+library (lmtest)
+# Breusch-Pagan Test for Heteroskedasticity
+bptest(within_model)
+
+```
+```{r}
+# Durbin-Watson Test for Serial Correlation
+dwtest(within_model)
+```
+
+
