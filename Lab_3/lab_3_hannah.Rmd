@@ -7,6 +7,16 @@ output:
 
 ```{r load packages, echo=FALSE, message=FALSE}
 library(tidyverse)
+# Provide a set of estimators for models and (robust) covariance matrices and tests for panel data econometrics,
+library(plm)
+## Functions, data sets, examples, demos, and vignettes for the book Christian Kleiber and Achim Zeileis (2008),
+#Applied Econometrics with R
+library(AER)
+## provides geoms for ggplot2 to repel overlapping text labels.
+library(ggrepel)
+library(stargazer)
+library(gridExtra)
+
 ```
 
 
@@ -46,6 +56,7 @@ As with every EDA this semester, the goal of this EDA is not to document your ow
 
 ```{r}
 data
+
 ```
 
 ```{r}
@@ -68,7 +79,7 @@ data_piv <- data_piv %>%
   ) %>% 
   filter(value == 1) %>% 
   select(-value)
-
+data_piv$speed_70plus <- data_piv$sl70plus
 data_piv <- data_piv %>%
   pivot_longer(
     cols = starts_with("sl"),
@@ -181,13 +192,9 @@ Estimate a linear regression model of *totfatrte* on a set of dummy variables fo
     - Are the uncertainty estimate reliable, unbiased estimates of sampling based variability? Or, are they biased due to the way that the data is structured? 
     
 ```{r}
-pooled_ols <- plm(total_fatalities_rate ~ speed_limit, data = data_piv,
-index = c("state", "year"),
-effect = "individual", model = "pooling")
+pooled_ols <- lm(total_fatalities_rate ~ time(year), data = data_piv)
 summary(pooled_ols)
 
-#lin_mod <- lm(total_fatalities_rate ~ seatbelt + speed_limit + blood_alc + perse + statepop + zerotol + minage, data = data_piv)
-#summary(lin_mod)
 ```
   
 
@@ -213,7 +220,7 @@ If it is appropriate, include transformations of these variables. Please careful
 
 
 ```{r}
-expanded_mod <- plm(total_fatalities_rate ~ speed_limit + blood_alc + perse + sbprim + sbsecon + sl70plus + gdl + perc14_24 + unem + vehicmilespc, data = data_piv,
+expanded_mod <- plm(total_fatalities_rate ~ time(year) + blood_alc + perse + sbprim + sbsecon + speed_70plus + gdl + perc14_24 + unem + vehicmilespc, data = data_piv,
 index = c("state", "year"),
 effect = "individual", model = "pooling")
 summary(expanded_mod)
@@ -234,6 +241,14 @@ Which set of estimates do you think is more reliable? Why do you think this?
 - What assumptions are needed in each of these models?  
 - Are these assumptions reasonable in the current context?
 
+```{r}
+within_model<- plm(total_fatalities_rate ~ time(year) + blood_alc + perse + sbprim + sbsecon + speed_70plus + gdl + perc14_24 + unem + vehicmilespc, data = data_piv,
+index = c("state", "year"),
+effect = "individual", model = "within")
+summary(within_model)
+```
+
+
 # (10 points) Consider a Random Effects Model 
 
 Instead of estimating a fixed effects model, should you have estimated a random effects model?
@@ -241,6 +256,20 @@ Instead of estimating a fixed effects model, should you have estimated a random 
 - Please state the assumptions of a random effects model, and evaluate whether these assumptions are met in the data. 
 - If the assumptions are, in fact, met in the data, then estimate a random effects model and interpret the coefficients of this model. Comment on how, if at all, the estimates from this model have changed compared to the fixed effects model. 
 - If the assumptions are **not** met, then do not estimate the data. But, also comment on what the consequences would be if you were to *inappropriately* estimate a random effects model. Would your coefficient estimates be biased or not? Would your standard error estimates be biased or not? Or, would there be some other problem that might arise?
+```{r}
+pfatdat <- pdata.frame(data_piv, index=c("state", "year"))
+
+
+pfatdat <- pfatdat[!duplicated(pfatdat), ]
+```
+
+
+```{r}
+re.model <- plm(total_fatalities_rate ~ time(year) + blood_alc + perse + sbprim + sbsecon + speed_70plus + gdl + perc14_24 + unem + vehicmilespc, data = pfatdat,
+index = c("state", "year"), model = "random")
+summary(re.model)
+```
+
 
 # (10 points) Model Forecasts 
 
@@ -254,6 +283,11 @@ Now, use these changes in driving to make forecasts from your models.
 
 - Suppose that the number of miles driven per capita, increased by as much as the COVID boom. Using the FE estimates, what would the consequences be on the number of traffic fatalities? Please interpret the estimate.
 - Suppose that the number of miles driven per capita, decreased by as much as the COVID bust. Using the FE estimates, what would the consequences be on the number of traffic fatalities? Please interpret the estimate.
+
+```{r}
+
+```
+
 
 # (5 points) Evaluate Error 
 
