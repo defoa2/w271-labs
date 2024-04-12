@@ -144,13 +144,22 @@ pdata_speed_vars<- pdata %>%
 
 ```{r}
 #Creating speed_limit variable 
+# pdata <- within(pdata,{
+#               speed_limit <- 0
+#               speed_limit[sl55 >= 0.5]        <-55
+#               speed_limit[sl65 >= 0.5]        <-65
+#               speed_limit[sl70 >= 0.5]        <-70
+#               speed_limit[sl75 >= 0.5]        <-75   
+#               speed_limit[sl70plus >= 0.5]    <-75   
+# })
+
 pdata <- within(pdata,{
               speed_limit <- 0
-              speed_limit[sl55 >= 0.5]        <-55
-              speed_limit[sl65 >= 0.5]        <-65
-              speed_limit[sl70 >= 0.5]        <-70
-              speed_limit[sl75 >= 0.5]        <-75   
-              speed_limit[sl70plus >= 0.5]    <-75   
+              speed_limit[sl55 >= 0.5]        <-0
+              speed_limit[sl65 >= 0.5]        <-0
+              speed_limit[sl70 >= 0.5]        <-1
+              speed_limit[sl75 >= 0.5]        <-1
+              speed_limit[sl70plus >= 0.5]    <-1
 })
 
 pdata <- pdata %>%
@@ -167,10 +176,63 @@ pdata['speed_limit']
 ```
     - Produce a new variable, called `year_of_observation` that re-encodes the data that is in `d80`, `d81`, ... , `d04`. 
 ```{r}
-# pdata_yr_data <- pdata %>% 
-#   select(c('d80','d81','d82','d83','d84','d85',
-#            'd86','d87','d88','d89','d90','d91'))
-# pdata_yr_data
+
+pdata <- within(pdata,{
+              state_no <- state})
+#pdata$state_no
+#pdata$stat_no <- pdata$state
+pdata$state <- recode(pdata$state,
+              '1' =  'AL',
+              '3' = 'AZ',
+              '4' = 'AR',
+              '5' = 'CA',
+              '6' = 'CO',
+              '7' = 'CT', 
+              '8' = 'DE',
+              '9' = 'DC',  
+              '10' = 'FL',
+              '11' =  'GA',
+              '12' = 'HI',
+              '13' = 'ID',
+              '14' = 'IL',
+              '15' = 'IN',
+              '16' = 'IA',
+              '17' = 'KS',
+              '18' = 'KY', 
+              '19' = 'LA',
+              '20' =  'ME',
+              '21' = 'MT',
+              '22' = 'NE',
+              '23' = 'NV',
+              '24' = 'NH',
+              '25' = 'NJ',
+              '26' = 'NM',
+              '27' = 'NY',
+              '28' = 'NC',
+              '29' = 'ND',
+              '30' = 'OH',
+              '31' = 'OK',
+              '32' = 'OR',
+              '33' = 'MD',
+              '34' = 'MA',
+              '35' = 'MI',
+              '36' = 'MN',
+              '37' = 'MS',
+              '38' = 'MO',
+              '39' = 'PA',
+              '40' = 'RI',
+              '41' = 'SC',
+              '42' = 'SD',
+              '43' = 'TN',
+              '44' = 'TX',
+              '45' = 'UT',
+              '46' = 'VT',
+              '47' = 'VA',
+              '48' = 'WA', 
+              '49' = 'WV',
+              '50' = 'WI',
+              '51' = 'WY'
+)
 ```
 
 ```{r}
@@ -341,43 +403,42 @@ p1
 
 ```{r,warning=FALSE,echo=FALSE, fig.height=6, fig.width=12}
 #State label data 
-states <- read_csv(f='./data/states.csv',show_col_types = FALSE)
-
+#states <- read_csv(f='./data/states.csv',show_col_types = FALSE)
 
 
 p2 <- pdata %>%
-  filter(as.integer(state) <= 12 ) %>%
+  filter(as.integer(state_no) <= 12 ) %>%
   ggplot(aes(x = as.Date(year,"%Y"), y = total_fatalities_rate)) +
   geom_line(aes(color = state)) +
   labs(x = "Year",  y = "Fatality rate")+
-  geom_label_repel(data = filter(pdata, as.integer(state) <= 12  & year == 1984),
-                   aes(label = state), nudge_x = .75,na.rm = TRUE) +
+  geom_label_repel(data = filter(pdata, as.integer(state_no) <= 12  & year == 1984),
+                   aes(label = state), nudge_x = .75, na.rm = TRUE) +
   theme(legend.position = "none")
 
 p3 <- pdata %>%
-  filter(as.integer(state) >12 & as.integer(state)<= 24 ) %>%
+  filter(as.integer(state_no) >12 & as.integer(state_no)<= 24 ) %>%
   ggplot(aes(x = as.Date(year,"%Y"), y = total_fatalities_rate)) +
   geom_line(aes(color = state)) +
   labs(x = "Year",  y = "Fatality rate")+
-  geom_label_repel(data = filter(pdata, as.integer(state) <= 12  & year == 1984),
+  geom_label_repel(data = filter(pdata, as.integer(state_no) >12 & as.integer(state_no)<=24 & year == 1984),
                    aes(label = state), nudge_x = .75,na.rm = TRUE) +
   theme(legend.position = "none")
 
 p4 <- pdata %>%
-  filter(as.integer(state) >24 & as.integer(state)<= 36 ) %>%
+  filter(as.integer(state_no) >24 & as.integer(state_no)<= 36 ) %>%
   ggplot(aes(x = as.Date(year,"%Y"), y = total_fatalities_rate)) +
   geom_line(aes(color = state)) +
   labs(x = "Year",  y = "Fatality rate")+
-  geom_label_repel(data = filter(pdata, as.integer(state) <= 12  & year == 1984),
+  geom_label_repel(data = filter(pdata, as.integer(state_no) >24 & as.integer(state_no)<= 36  & year == 1984),
                    aes(label = state), nudge_x = .75,na.rm = TRUE) +
   theme(legend.position = "none")
 
 p5 <- pdata %>%
-  filter(as.integer(state) >36 & as.integer(state)<= 48 ) %>%
+  filter(as.integer(state_no) >36 & as.integer(state_no)<= 51 ) %>%
   ggplot(aes(x = as.Date(year,"%Y"), y = total_fatalities_rate)) +
   geom_line(aes(color = state)) +
   labs(x = "Year",  y = "Fatality rate")+
-  geom_label_repel(data = filter(pdata, as.integer(state) <= 12  & year == 1984),
+  geom_label_repel(data = filter(pdata, as.integer(state_no) >36 & as.integer(state_no)<=51  & year == 1984),
                    aes(label = state), nudge_x = .75,na.rm = TRUE) +
   theme(legend.position = "none")
 grid.arrange(p2,p3,p4, p5, nrow = 2, ncol = 2)
@@ -386,7 +447,7 @@ grid.arrange(p2,p3,p4, p5, nrow = 2, ncol = 2)
 
 ```{r,warning=FALSE,echo=FALSE, fig.height=6, fig.width=12}
 p6<- pdata %>%
-  filter(as.integer(state) <= 12 ) %>%
+  filter(as.integer(state_no) <= 12 ) %>%
   ggplot(aes(x = as.Date(year,"%Y"), y = total_fatalities_rate)) +
   geom_line() +
   facet_wrap(~ state, nrow = 3) +
@@ -394,7 +455,7 @@ p6<- pdata %>%
   theme(legend.position = "none")
 
 p7<-pdata %>%
-  filter(as.integer(state) > 12 & as.integer(state) <= 24 ) %>%
+  filter(as.integer(state_no) > 12 & as.integer(state_no) <= 24 ) %>%
   ggplot(aes(x = as.Date(year,"%Y"), y = total_fatalities_rate)) +
   geom_line() +
   facet_wrap(~ state, nrow = 3)+
@@ -402,7 +463,7 @@ p7<-pdata %>%
   theme(legend.position = "none")
 
 p8<-pdata %>%
-  filter(as.integer(state) > 24 & as.integer(state) <= 36 ) %>%
+  filter(as.integer(state_no) > 24 & as.integer(state_no) <= 36 ) %>%
   ggplot(aes(x = as.Date(year,"%Y"), y = total_fatalities_rate)) +
   geom_line() +
   facet_wrap(~ state, nrow = 3)+
@@ -410,7 +471,7 @@ p8<-pdata %>%
   theme(legend.position = "none")
 
 p9<-pdata %>%
-  filter(as.integer(state) > 36 & as.integer(state) <= 48 ) %>%
+  filter(as.integer(state_no) > 36 & as.integer(state_no) <= 48 ) %>%
   ggplot(aes(x = as.Date(year,"%Y"), y = total_fatalities_rate)) +
   geom_line() +
   facet_wrap(~ state, nrow = 3)+
@@ -423,7 +484,7 @@ grid.arrange(p6,p7,p8, p9, nrow = 2, ncol = 2)
 
 library(ggrepel)
 p10<- pdata %>%
-  filter(as.integer(state) <= 12 ) %>%
+  filter(as.integer(state_no) <= 12 ) %>%
   ggplot(aes(x = as.Date(year,"%Y"), y = unemployment)) +
   geom_line(aes(color = state)) +
   labs(x = "Year",  y = "Unemployement Rate")+
@@ -432,29 +493,29 @@ p10<- pdata %>%
   theme(legend.position = "none")
 
 p11<-pdata %>%
-   filter(as.integer(state) > 12 & as.integer(state) <= 24 ) %>%
+   filter(as.integer(state_no) > 12 & as.integer(state_no) <= 24 ) %>%
   ggplot(aes(x = as.Date(year,"%Y"), y = unemployment)) +
   geom_line(aes(color = state)) +
   labs(x = "Year",  y = "Unemployement Rate")+
-  geom_label_repel(data = filter(pdata, as.integer(state) > 12 & as.integer(state) <= 24  & year == 1984),
+  geom_label_repel(data = filter(pdata, as.integer(state_no) > 12 & as.integer(state_no) <= 24  & year == 1984),
                    aes(label = state), nudge_x = .75,na.rm = TRUE) +
   theme(legend.position = "none")
 
 p12<- pdata %>%
-  filter(as.integer(state) > 24 &as.integer(state) <= 36 ) %>%
+  filter(as.integer(state_no) > 24 &as.integer(state_no) <= 36 ) %>%
   ggplot(aes(x = as.Date(year,"%Y"), y = unemployment)) +
   geom_line(aes(color = state)) +
   labs(x = "Year",  y = "Unemployement Rate")+
-  geom_label_repel(data = filter(pdata, as.integer(state) > 24 &as.integer(state) <= 36 & year == 1984),
+  geom_label_repel(data = filter(pdata, as.integer(state_no) > 24 &as.integer(state_no) <= 36 & year == 1984),
                    aes(label = state), nudge_x = .75,na.rm = TRUE) +
   theme(legend.position = "none")
 
 p13<- pdata %>%
-  filter(as.integer(state) > 36 ) %>%
+  filter(as.integer(state_no) > 36 ) %>%
   ggplot(aes(x = as.Date(year,"%Y"), y = unemployment)) +
   geom_line(aes(color = state)) +
   labs(x = "Year",  y = "Unemployement Rate") +
-  geom_label_repel(data = filter(pdata, as.integer(state) > 36 & year == 1984),aes(label = state), nudge_x = .75,na.rm = TRUE) +
+  geom_label_repel(data = filter(pdata, as.integer(state_no) > 36 & year == 1984),aes(label = state), nudge_x = .75,na.rm = TRUE) +
   theme(legend.position = "none")
 
 grid.arrange(p10,p11,p12, p13, nrow = 2, ncol = 2)
@@ -472,10 +533,19 @@ basic_model <- lm(total_fatalities_rate ~ d81 + d82 + d83 + d84 + d85 + d86  + d
 summary(basic_model)
 ```
 - Why is fitting a linear model a sensible starting place? 
+
+Using 1980 as a base year, the relative total fatalities rate declines over time. The rate is approximately 8.76 percent lower in 2004 than in 1980. All of the years rates, except 1981, are significantly different from 1980. The R-square is low, 0.13, but F-Statistic is significant (p<0.001). 
+
 - What does this model explain, and what do you find in this model? 
+This model shows there is a statistically significant decline in the fatality rate over time. 
+
 - Did driving become safer over this period? Please provide a detailed explanation.
+It appears fewer people were fatally injured in car accidents over time. It is unclear whether this is due to improved vehicle safety or other regulations. We also don't know what the rate of serious, but not fatal injuries were during this time. 
+
 - What, if any, are the limitation of this model. In answering this, please consider **at least**: 
     - Are the parameter estimates reliable, unbiased estimates of the truth? Or, are they biased due to the way that the data is structured?
+    
+    
     - Are the uncertainty estimate reliable, unbiased estimates of sampling based variability? Or, are they biased due to the way that the data is structured? 
 
 # (15 points) Expanded Model 
