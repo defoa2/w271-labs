@@ -652,8 +652,8 @@ p17
 There are a number of NAs in the Seatbelt regulation variable (n > 900). Still, over 99 percent of all panel observations included either primary or secondary seatbelt use. There is little variation in this variable. Essentially, it appears seatbelts were mandatory across locations by 1985.
 
 ```{r, echo = FALSE, warning=FALSE}
-summary(pdata$primary_seatbelt)
-summary(pdata$secondary_seatbelt)
+#summary(pdata$primary_seatbelt)
+#summary(pdata$secondary_seatbelt)
 
 p19 <- pdata %>%
   group_by(year) %>%
@@ -663,26 +663,43 @@ p19 <- pdata %>%
        x = 'Year', 
        y = 'No, Primary (1), or Secondary (2) Laws') +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8))
-p19
+
 
 
 ```
 
+```{r, echo = FALSE, warning = FALSE}
+fatalities_seatbelt <- pdata %>% 
+  data.frame() %>%
+  ggplot(aes(x = reorder(seatbelt, state), y = total_fatalities_rate)) + 
+  geom_boxplot() + 
+  labs(x = "Seatbelt Requirement (0=None, 1 = primary, 2 = secondary)", y = "Total Fatalities/100,000", title = "Total Fatalities Rate across Seat Belt Requirement Categories")
+
+p19 / fatalities_seatbelt
+```
 
 ### Drunk Driving 
+
+The blood alcohol variable indicates the level of constraint on drivers regarding the amount of alcohol they may consume and not be considered driving drunk. As the following figure illustrates, most states started to cap blood alcohol at 0.10 in prior to 1980. Then, starting in 1984, states increasingly capped the blood alcohol level at 0.85 for drunk driving. The red vertical bars represent the spread of TFR rates across states each year. The trend indicates a decrease in TFR as more states lower allowable blood alcohol levels. 
 ```{r, echo= FALSE, warning = FALSE} 
+
 p20 <- pdata %>%
+  mutate(mean_perc_fatalities = total_fatalities_rate/100) %>%
   group_by(year) %>%
   ggplot(aes(x = year, y = blood_alcohol)) +
   geom_count() +
-  labs(title = 'Blood Alcohol Level for Drunk Driving', 
+  geom_line(aes(x = year, y = mean_perc_fatalities, col = 'red')) +
+  labs(title = 'Blood Alcohol Level Allowances over Time', 
        x = 'Year', 
-       y = '0, 0.8, or 0.10 Blood Alcohol Levels') +
+       y = '0, 0.8, or 0.10 Blood Alcohol Levels & \
+       Total Fatalities Rate (% in Red)') +
   theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8))
-p20
+p20 
 ```
 
 
+
+The following box plot shows the relationship between blood alcohol restrictions and fatalities. Mean TFR is lowest when the blood alcohol limit is 0.85 in a state.
 ```{r, echo = FALSE, warning=FALSE}
 #correlations among variables of interest
 fatalities_bac <- pdata %>% 
@@ -695,9 +712,7 @@ fatalities_bac
 
 ```
 
-```{r, echo = F, warning = FALSE}
 
-```
 # (15 points) Preliminary Model
 
 Estimate a linear regression model of *totfatrte* on a set of dummy variables for the years 1981 through 2004 and interpret what you observe. In this section, you should address the following tasks: 
@@ -720,9 +735,10 @@ It appears fewer people were fatally injured in car accidents over time. It is u
 
 - What, if any, are the limitation of this model. In answering this, please consider **at least**: 
     - Are the parameter estimates reliable, unbiased estimates of the truth? Or, are they biased due to the way that the data is structured?
-    
+    *Answer*: 
     
     - Are the uncertainty estimate reliable, unbiased estimates of sampling based variability? Or, are they biased due to the way that the data is structured? 
+    *Answer*:
 
 # (15 points) Expanded Model 
 
