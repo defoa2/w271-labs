@@ -29,7 +29,7 @@ if(!"ggrepel"%in%rownames(installed.packages())) {install.packages("ggrepel")}
 if(!"seasonal"%in%rownames(installed.packages())) {install.packages("seasonal")}
 if(!"gridExtra"%in%rownames(installed.packages())) {install.packages("gridExtra")}
 if(!"xml2"%in%rownames(installed.packages())) {install.packages("xml2")}
-
+if(!"ggpubr"%in%rownames(installed.packages())) {install.packages("ggpubr")}
 
 library(fma)
 library(tidyverse)
@@ -77,7 +77,7 @@ library(tibble)
 library(tidyr)
 library(xml2)
 library(tidyverse)
-
+library(ggpubr)
 # Provide a set of estimators for models and (robust) covariance matrices and tests for panel data econometrics, 
 library(plm)
 
@@ -273,17 +273,7 @@ pdata['year_of_observation']
     - Produce a new variable for each of the other variables that are one-hot encoded (i.e. `bac*` variable series). 
 ```{r}
 #converting the blood alcohol variable to 0, 8, 10 
-# pdata <- within(pdata,{
-#               bac <- 0
-#               bac[bac08 >= 0.5 & bac10 < 0.5]     <- .08
-#               bac[bac10 >= 0.5 & bac08 < 0.5]     <- .10
-#               bac[!is.finite(bac08)]              <- 0
-#               bac[!is.finite(bac10)]              <- 0
-#               bac[bac08 ==0 & bac10 == 0]         <- 0
-#               bac[bac08 > 0.5 & bac10 == 0]       <- .08
-#               bac[bac10 < 0.5 & bac08 == 0]       <- .10
-#               bac[bac10 == 0.5 & bac08 >= 0.5]    <- .08
-# })
+
 
 pdata <- within(pdata,{
               bac <- 0
@@ -297,6 +287,14 @@ pdata <- within(pdata,{
               bac[bac10 == 0 & bac08 > 0]         <- 0.08
 })
 
+pdata<- within(pdata, {
+            minimum_age <- 0 
+            minimum_age[minage<18.5]                  <- 18
+            minimum_age[minage>=18.5 & minage<19.5]   <- 19
+            minimum_age[minage>= 19.5 & minage<20.5]  <- 20
+            minimum_age[minage>= 20.5 & minage<21.5]  <- 21
+  
+})
 
 table(is.na(pdata$bac))
 NA_obs<- pdata %>% 
@@ -306,7 +304,28 @@ NA_obs<- pdata %>%
 NA_obs
 
 pdata <- pdata %>% 
-  mutate(bac <- is.ordered(bac))
+  mutate(bac <- is.ordered(bac)) %>% 
+  mutate(minimum_age <- is.ordered(minimum_age))
+#Order minimum drinking age 
+
+```
+```{r}
+#Clean per se variable or the one indicating DUIs can be issued for increased BAC above level for driving or attempting to drive
+pdata <- within(pdata,{
+              per_se <- 0
+              per_se[perse > 0]        <- 1
+})
+
+pdata <- within(pdata, {
+  primary_seatbelt <-0 
+  primary_seatbelt[seatbelt == 1]     <-1
+})
+
+pdata <- within(pdata, {
+  secondary_seatbelt <- 0
+  secondary_seatbelt[seatbelt == 2] <-1
+})
+
 
 
 ```
@@ -315,13 +334,16 @@ pdata <- pdata %>%
 pdata <- pdata %>% 
   #select(!c(d80:d04)) %>% 
   select(!c(sl55:sl75)) %>%
-  select(!c(bac08:bac10))   
+  select(!c(bac08:bac10)) %>% 
+  select(!perse) %>%
+  #select(!seatbelt) %>%
+  select(!sbprim) %>% select(!sbsecon)
 #Renaming variables 
-change <- c(total_fatalities_rate = 'totfatrte', minimum_age = 'minage' , unemployment = 'unem', minimum_age = 'minage',
-            total_fatalities = 'totfat', night_fatalities = 'nghtfat' , weekend_fatalities = 'wkndfat', 
-            total_fatalities_per_vehicle = 'totfatpvm', night_fatalities_per_verhicle = 'nghtfatpvm',
-            weekend_fatalities_per_vehicle = 'wkndfatpvm', state_population = 'statepop',  nght_fatalities_rate = 'nghtfatrte', 
-            zero_tolerance = 'zerotol', per_se = 'perse', weekend_fatalities_rate = 'wkndfatrte', 
+change <- c(total_fatalities_rate = 'totfatrte', unemployment = 'unem', 
+            total_fatalities = 'totfat', night_fatalities = 'nghtfat' , weekend_fatalities = 'wkndfat',
+            total_fatalities_one_hundred_million_miles = 'totfatpvm',  night_fatalities_one_hundred_million_miles = 'nghtfatpvm', weekend_fatalities_one_hundred_million_miles = 'wkndfatpvm',state_population = 'statepop',  
+            night_fatalities_rate = 'nghtfatrte', 
+            zero_tolerance = 'zerotol',  weekend_fatalities_rate = 'wkndfatrte', 
             vehicle_miles = 'vehicmiles', blood_alcohol = 'bac', percent_14_to_24 = 'perc14_24')
 pdata <- pdata %>% 
   rename(all_of(change))
@@ -369,27 +391,43 @@ annual_mean_total_fatalities_rate <- pdata%>%
   group_by(year_of_observation)%>%
   summarize(avg_total_fatalities_rate = mean(total_fatalities_rate))
 
-annual_mean_total_fatalities_rate
+
 
 ```
 As with every EDA this semester, the goal of this EDA is not to document your own process of discovery -- save that for an exploration notebook -- but instead it is to bring a reader that is new to the data to a full understanding of the important features of your data as quickly as possible. In order to do this, your EDA should include a detailed, orderly narrative description of what you want your reader to know. Do not include any output -- tables, plots, or statistics -- that you do not intend to write about.
 ## EDA 
+### Total Fatalities Rate
+  *Answer*: The main variable of interest is the total fatalities rate (TFR). The mean TFR across all time and observations is 18.92. This is slightly higher than the median TFR, 18.435, illustrated as the red line in the histogram. The fatalities distribution is skewed to the right. Outliers would lie either about the 95% quartile of a TFR greater or equal to 29.89 or below the 5th percentile (TFR$<=$9.58).In the following ACF diagram of annual average TFR across states also illustrates the autocorrelation across lagged TFR values.  
+
 ```{r}
 #Total_Fatalities 
-
-hist(pdata$total_fatalities_rate)
+mean.tfr<-mean(pdata$total_fatalities_rate)
+mean.tfr
+median.tfr<-median(pdata$total_fatalities_rate)
+median.tfr
+hist.tfr<- hist(pdata$total_fatalities_rate, main = "Histogram of Total Fatalities Rate")  
 abline(v = median(pdata$total_fatalities_rate),col = "red")
+abline(v = mean(pdata$total_fatalities_rate),col = "blue")
+labs("Histogram of Total Fatalities Rate")
 
 tf_quantiles <- quantile(pdata[['total_fatalities_rate']], p = c(0.05, 0.25, 0.50, 0.75, 0.95))
   
 tf_quantiles
 
-tf_boxplot <- boxplot(pdata[['total_fatalities_rate']], ylab = 'Total Fatalities Rate')
 
+acf(annual_mean_total_fatalities_rate$avg_total_fatalities_rate)
 
+# fatalities_unemployment <- pdata %>% 
+#   data.frame() %>%
+#   ggplot(aes(x = year, y = total_fatalities_rate, group = year)) + 
+#   geom_boxplot() + 
+#   labs(x = "Year", y = "Total Fatalities", title = "Total Fatalaties Rate vs Unemployment by Year")
+# 
+# fatalities_unemployment
 
 ```
-```{r}
+The total fatality rate is dynamic over time, as illustrated in the line plot of TFR across time. 
+```{r, echo=F}
 
 p1<- ggplot(data = pdata, aes(x = as.Date(year,"%Y"), y = total_fatalities_rate)) +
   geom_line() +
@@ -399,7 +437,7 @@ p1<- ggplot(data = pdata, aes(x = as.Date(year,"%Y"), y = total_fatalities_rate)
 p1
 
 ```
-
+Further visualization of TFR is presented by state in the following diagrams. The four panels include different groupings of the states, by alphabetical order. In the upper left panel, the state with the highest initial TFR is Arizona and the lowest is Illinois. As time progresses, TFR drops across all states, especially Deleware and Colorado. For the states represented in the upper right-hand panel, New York has a TFR about 40, one of the highest of all time. Only Nebraska appears to maintain a low TFR amoung members of this group. The next group of states, represented in the lower left-hand panel, appear to be more likely to have TFRs below 20 per 100,000 persons. The next group, in the lower right-hand panel, has the highest TFR per 100,000 persons across all groups. Wyoming starts out with well over 40 TFR per 100,000 persons in the 1980s. Rhode Island, also in the group, is among the states with the lowest TFR per 100,000. 
 
 ```{r,warning=FALSE,echo=FALSE, fig.height=6, fig.width=12}
 #State label data 
@@ -410,7 +448,7 @@ p2 <- pdata %>%
   filter(as.integer(state_no) <= 12 ) %>%
   ggplot(aes(x = as.Date(year,"%Y"), y = total_fatalities_rate)) +
   geom_line(aes(color = state)) +
-  labs(x = "Year",  y = "Fatality rate")+
+  labs(x = "Year",  y = "Total Fatality rate")+
   geom_label_repel(data = filter(pdata, as.integer(state_no) <= 12  & year == 1984),
                    aes(label = state), nudge_x = .75, na.rm = TRUE) +
   theme(legend.position = "none")
@@ -444,7 +482,7 @@ p5 <- pdata %>%
 grid.arrange(p2,p3,p4, p5, nrow = 2, ncol = 2)
 ```
 
-
+The next set of diagrms seperates all TFRs across all states. This additional view of TFRs allows us to see the diferences in TFR variation with more clarity. While states such as Deleware had relatively low TFR by 2004, the diagram indicates higher rates of variation than statues such as Kansas, Kentucky, Nebraska, Minnesota, Pennsylvania, and Washington. 
 ```{r,warning=FALSE,echo=FALSE, fig.height=6, fig.width=12}
 p6<- pdata %>%
   filter(as.integer(state_no) <= 12 ) %>%
@@ -479,7 +517,38 @@ p9<-pdata %>%
   theme(legend.position = "none")
 grid.arrange(p6,p7,p8, p9, nrow = 2, ncol = 2)
 ```
+We now turn our attention to other variables of interest with relationship to TFR. These variables include measures of young people in the population, unemployment, miles driven per capita, seatbelt laws, and drunk driving regulations. Across the nation, the percent of the population between ages 14 and 24 years is 15.33 percent. This is almost half a percent higher than the median, 14.29 percent. The distribution is skewed to the right. The legal age to drink alcohol is primary 21 or in 991 of the cases minimum age is 21. It is 18 in 98 cases, 19 in 68 observations, and 20 in 42 observations. We may want to consider a dummy variable for minimum age is at or above 21 is one and zero otherwise.  
 
+### Youth 
+```{r, echo = F, warning = F}
+#Percent 14 to 24
+mean_14_24 <- mean(pdata$percent_14_to_24)
+mean_14_24
+median14_24 <- median(pdata$percent_14_to_24)
+median14_24
+hist(pdata$percent_14_to_24)
+abline(v = mean(pdata$percent_14_to_24), col = "red")
+abline(v = median(pdata$percent_14_to_24), col = "blue")
+
+tfr_young <- pdata %>% 
+  ggplot(aes(x = percent_14_to_24, y = total_fatalities_rate)) + 
+  geom_point(aes = (color = year)) + 
+  #geom_smooth(se = FALSE) + 
+  labs(
+    x = "Percent of Youth 14 to 24",
+    y = "Total Fatalities Rate", 
+    color = "year", 
+    title = "Total Fatalities Rate Increasing with Younger Population", 
+    subtitle = "TFR vs Percent of Population 14 to 24"
+  )
+tfr_young
+hist_age <- hist(pdata$minimum_age)  
+
+tabulate(pdata$minimum_age)
+
+
+```
+### Unemployment 
 ```{r,warning=FALSE,echo=FALSE, fig.height=6, fig.width=12}
 
 library(ggrepel)
@@ -521,7 +590,114 @@ p13<- pdata %>%
 grid.arrange(p10,p11,p12, p13, nrow = 2, ncol = 2)
 
 ```
+### Miles Per Capita
 
+We converted the miles driven per state variable from billion miles per state to thousands of miles per capita for visualiation. The four panel visualization illustrates a mixed relationship between miles driven per capita and total fatalities rate. There is an indication of a positive relationship between miles driven per capita and total fatalities rate when looking at extreme examples of high fatality states (i.e., Wyoming) and low fatality states (i.e., Delaware and Rhode Island). The correlation between the TFR and total vehicle miles driven is -0.26.
+```{r, echo = F, warning = F}
+#cor(pdata$total_fatalities_rate, pdata$vehicle_miles)
+pdata <- pdata %>% 
+  group_by(state) %>% 
+  mutate(miles_per_capita = (vehicle_miles*1000000)/state_population)
+
+#pdata$miles_per_capita
+#Create average annual fatality rate per state
+pdata <- pdata %>% 
+  group_by(state) %>% 
+    mutate(mean_tfr = sum(total_fatalities_rate)/(2004-1980))
+p14 <- pdata %>% 
+  filter(as.integer(state_no) <= 12 ) %>%
+  ggplot(aes(x = miles_per_capita, y = total_fatalities_rate, color = state))+
+  geom_point() +
+  facet_wrap(~ state, nrow = 1) +
+  labs( title = "Mean Total Fatality Rate versus Thousand Miles Driver per Capita",
+       y = "State-Level Mean Total Fatality Rate", 
+       x = "Thousand Miles Driver per Capita") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8))
+p14
+p15 <- pdata %>% 
+  filter(as.integer(state_no) > 12 & as.integer(state_no) <=24 ) %>%
+  ggplot(aes(x = miles_per_capita, y = total_fatalities_rate, color = state))+
+  geom_point() +
+  facet_wrap(~ state, nrow = 1) +
+  labs( title = "Mean Total Fatality Rate versus Thousand Miles Driver per Capita",
+       y = "State-Level Mean Total Fatality Rate", 
+       x = "Thousand Miles Driver per Capita")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8))
+
+p15
+p16 <- pdata %>% 
+  filter(as.integer(state_no) > 24 & as.integer(state_no) <=36 ) %>%
+  ggplot(aes(x = miles_per_capita, y = total_fatalities_rate, color = state))+
+  geom_point() +
+  facet_wrap(~ state, nrow = 1) +
+  labs( title = "Mean Total Fatality Rate versus Thousand Miles Driver per Capita",
+       y = "State-Level Mean Total Fatality Rate", 
+       x = "Thousand Miles Driver per Capita") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8))
+
+p16
+p17 <- pdata %>% 
+  filter(as.integer(state_no) > 36  ) %>%
+  ggplot(aes(x = miles_per_capita, y = total_fatalities_rate, color = state))+
+  geom_point() +
+  facet_wrap(~ state, nrow = 1) +
+  labs( title = "Mean Total Fatality Rate versus Thousand Miles Driver per Capita",
+    y = "State-Level Mean Total Fatality Rate", 
+       x = "Thousand Miles Driver per Capita") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8))
+p17
+```
+### Seatbelt Regulation 
+
+There are a number of NAs in the Seatbelt regulation variable (n > 900). Still, over 99 percent of all panel observations included either primary or secondary seatbelt use. There is little variation in this variable. Essentially, it appears seatbelts were mandatory across locations by 1985.
+
+```{r, echo = FALSE, warning=FALSE}
+summary(pdata$primary_seatbelt)
+summary(pdata$secondary_seatbelt)
+
+p19 <- pdata %>%
+  group_by(year) %>%
+  ggplot(aes(x = year, y = seatbelt)) +
+  geom_count() +
+  labs(title = 'Presence of Seatbelt Laws', 
+       x = 'Year', 
+       y = 'No, Primary (1), or Secondary (2) Laws') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8))
+p19
+
+
+```
+
+
+### Drunk Driving 
+```{r, echo= FALSE, warning = FALSE} 
+p20 <- pdata %>%
+  group_by(year) %>%
+  ggplot(aes(x = year, y = blood_alcohol)) +
+  geom_count() +
+  labs(title = 'Blood Alcohol Level for Drunk Driving', 
+       x = 'Year', 
+       y = '0, 0.8, or 0.10 Blood Alcohol Levels') +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size=8))
+p20
+```
+
+
+```{r, echo = FALSE, warning=FALSE}
+#correlations among variables of interest
+fatalities_bac <- pdata %>% 
+  data.frame() %>%
+  ggplot(aes(x = reorder(blood_alcohol, state), y = total_fatalities_rate)) + 
+  geom_boxplot() + 
+  labs(x = "Blood Alcohol Level", y = "Total Fatalities/100,000", title = "Total Fatalities Rate vs Minimum Blood Alcohol")
+
+fatalities_bac
+
+```
+
+```{r, echo = F, warning = FALSE}
+
+```
 # (15 points) Preliminary Model
 
 Estimate a linear regression model of *totfatrte* on a set of dummy variables for the years 1981 through 2004 and interpret what you observe. In this section, you should address the following tasks: 
