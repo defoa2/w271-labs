@@ -65,7 +65,7 @@ data$perse_binary <- ifelse(data$perse > 0.5, 1, 0)
 data$gdl_binary <- ifelse(data$gdl > 0.5, 1, 0)
 data$sbprim_binary <- ifelse(data$sbprim > 0.5, 1, 0)
 data$sbsec_binary <- ifelse(data$sbsecon > 0.5, 1, 0)
-
+data$sl70plus <- ifelse(data$sl70plus > 0.5, 1, 0)
 
 col_num <- 31:55
 years <- 1980:2004
@@ -81,8 +81,10 @@ for (i in 1:25){
 }
 
 
-data$bac <- ifelse(data$bac08 == 1, "0.08", NA)
-data$bac <- ifelse(data$bac10 ==1, "0.1", data$bac)
+data$bac <- ifelse(data$bac08 >0.5, "0.08", NA)
+data$bac <- ifelse(data$bac10 > 0.5, "0.1", data$bac)
+
+
 
 data$total_fatalities_rate <- data$totfatrte
 data$night_fatalities_rate <- data$nghtfatrte
@@ -300,7 +302,7 @@ If it is appropriate, include transformations of these variables. Please careful
 - Does having a primary seat belt law? 
 
 ```{r}
-expanded_mod <- lm(log(total_fatalities_rate)~year_test_fac + bac + factor(perse_binary) + factor(sbprim_binary) + factor(sbsec_binary) + factor(gdl_binary) + perc14_24 + log(unem) + log(vehicmilespc), data = data)
+expanded_mod <- lm(log(total_fatalities_rate)~year_test_fac + factor(bac) + factor(sl70plus) + factor(perse_binary) + factor(sbprim_binary) + factor(sbsec_binary) + factor(gdl_binary) + perc14_24 + log(unem) + log(vehicmilespc), data = data)
 summary(expanded_mod)
 ```
 
@@ -319,7 +321,7 @@ Which set of estimates do you think is more reliable? Why do you think this?
 - Are these assumptions reasonable in the current context?
 
 ```{r}
-within_model<- plm(log(total_fatalities_rate)~year_test_fac + bac + factor(perse_binary) + factor(sbprim_binary) + factor(sbsec_binary) + factor(gdl_binary) + perc14_24 + log(unem) + log(vehicmilespc),
+within_model<- plm(log(total_fatalities_rate)~year_test_fac + factor(bac) + factor(sl70plus) + factor(perse_binary) + factor(sbprim_binary) + factor(sbsec_binary) + factor(gdl_binary) + perc14_24 + log(unem) + log(vehicmilespc),
                    data = data,
                    index = c("state", "year_test_fac"), 
                    effect = "individual", model = "within")
@@ -330,7 +332,7 @@ summary(within_model)
 pFtest(within_model, expanded_mod)
 ```
 ```{r}
-fd_model<- plm(log(total_fatalities_rate)~year_test_fac + bac + factor(perse_binary) + factor(sbprim_binary) + factor(sbsec_binary) + factor(gdl_binary) + perc14_24 + log(unem) + log(vehicmilespc),
+fd_model<- plm(log(total_fatalities_rate)~year_test_fac + factor(bac) + factor(sl70plus) + factor(perse_binary) + factor(sbprim_binary) + factor(sbsec_binary) + factor(gdl_binary) + perc14_24 + log(unem) + log(vehicmilespc),
                    data = data,
                    index = c("state", "year_test_fac"), 
                    effect = "individual", model = "fd")
@@ -360,7 +362,7 @@ data
 
 ```{r}
 
-re.model <- plm(log(total_fatalities_rate)~year_test_fac + bac + factor(perse_binary) + factor(sbprim_binary) + factor(sbsec_binary) + factor(gdl_binary) + perc14_24 + log(unem) + log(vehicmilespc),
+re.model <- plm(log(total_fatalities_rate)~year_test_fac + factor(bac) + factor(sl70plus) + factor(perse_binary) + factor(sbprim_binary) + factor(sbsec_binary) + factor(gdl_binary) + perc14_24 + log(unem) + log(vehicmilespc),
                    data = data,
                 index = c("state", "year_test_fac"), model = "random", random.method = "walhus")
 summary(re.model)
