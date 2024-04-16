@@ -81,7 +81,7 @@ for (i in 1:25){
 }
 
 
-data$bac <- ifelse(data$bac08 >0.5, "0.08", NA)
+data$bac <- ifelse(data$bac08 >0.5, "0.08", "None")
 data$bac <- ifelse(data$bac10 > 0.5, "0.1", data$bac)
 
 
