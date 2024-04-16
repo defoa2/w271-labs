@@ -360,20 +360,11 @@ data
 ```
 
 
-```{r}
 
-re.model <- plm(log(total_fatalities_rate)~year_test_fac + factor(bac) + factor(sl70plus) + factor(perse_binary) + factor(sbprim_binary) + factor(sbsec_binary) + factor(gdl_binary) + perc14_24 + log(unem) + log(vehicmilespc),
-                   data = data,
-                index = c("state", "year_test_fac"), model = "random", random.method = "walhus")
-summary(re.model)
-```
 ```{r}
-phtest(within_model, re.model)
-```
-```{r}
-stargazer(linear_mod, expanded_mod, within_model, fd_model, re.model,
+stargazer(linear_mod, expanded_mod, within_model, fd_model,
 style="qje", type="text", omit.stat=c("adj.rsq","f"),
-column.labels = c("Prelim Model","Expanded Model","Within","FD","RE"))
+column.labels = c("Prelim Model","Expanded Model","Within","FD"))
 ```
 
 
