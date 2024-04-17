@@ -12,6 +12,8 @@ library(ggrepel)
 library(gridExtra)
 library(plm)
 library(stargazer)
+library(zoo)
+library (lmtest)
 ```
 
 
@@ -824,16 +826,7 @@ The dummy variable representing a state having a primary seatbelt law has a coef
 
 **Re-estimate the Expanded Model using fixed effects at the state level.** 
 
-- What do you estimate for coefficients on the blood alcohol variables? How do the coefficients on the blood alcohol variables change, if at all? 
-- What do you estimate for coefficients on per se laws? How do the coefficients on per se laws change, if at all? 
-- What do you estimate for coefficients on primary seat-belt laws? How do the coefficients on primary seatbelt laws change, if at all? 
-
- 
-The coefficient for bac = 0.1 variable in this fixed effects model is now  0.0042323,which is a smaller coefficient compared to the expanded model which has a positive coefficient for bac laws (4.494e-02). What is also notable is that this bac law was a significant explanatory variable in the expanded model, and in the fixed effects model it is not significant to explaining fatality rates. 
-
-In the fixed effects model, the coefficient for perse laws is -0.0534343,compared to -1.882e-02 in the expanded model. The direction is still negative, implying that the addition of per se laws decrease fatality rates. In the expanded model this coefficient wasn’t significant, but in the fixed effects model it is highly significant.
-
-The coefficient for the primary seatbelt law in this model is -0.0404917, and for the secondary seat belt law it is 0.0056980. The coefficient for the primary seatbelt law is small and positive for the expanded model , but negative in the fixed effect model. The coefficients for the secondary seat belt law are both small and positive in the fixed effects model and the expanded model. These coefficients are not significant in the expanded model, but in the fixed effects model the primary seatbelt law coefficient is significant. This implies that the primary seatbelt law has a negative effect on fatality rates.
+We ran within model and first difference models for state level fixed effects.
 
 ```{r}
 within_model<- plm(log(total_fatalities_rate)~year_test_fac + factor(bac) +
@@ -845,8 +838,46 @@ within_model<- plm(log(total_fatalities_rate)~year_test_fac + factor(bac) +
                    index = c("state", "year_test_fac"), 
                    effect = "individual", model = "within")
 
-summary(within_model)
+# summary(within_model)
 ```
+
+```{r}
+fd_model<- plm(log(total_fatalities_rate)~year_test_fac + factor(bac) + factor(sl70plus) + factor(perse_binary) + factor(sbprim_binary) + factor(sbsec_binary) + factor(gdl_binary) + perc14_24 + log(unem) + log(vehicmilespc),
+                   data = data,
+                   index = c("state", "year_test_fac"), 
+                   effect = "individual", model = "fd")
+
+# summary(fd_model)
+```
+
+
+We fail to reject both of the null hypothesis for the Wooldridge first difference statistical test. When both null hypothesis are rejected it means that the residuals are serially correlated for both the within model and the first difference model. To correct for serial correlation, we need to estimate the model parameters with autocorelation robust standard errors. We did so using cluster standard errors.
+
+```{r}
+pwfdtest(fd_model, data = data, h0="fe")
+```
+
+```{r}
+pwfdtest(fd_model, data = data, h0="fd")
+```
+
+```{r}
+within_model_robust <- coeftest(within_model, vcov=vcovHC(within_model,type="HC0",cluster="group"))
+within_model_robust
+```
+
+- What do you estimate for coefficients on the blood alcohol variables? How do the coefficients on the blood alcohol variables change, if at all? 
+- What do you estimate for coefficients on per se laws? How do the coefficients on per se laws change, if at all? 
+- What do you estimate for coefficients on primary seat-belt laws? How do the coefficients on primary seatbelt laws change, if at all? 
+
+ 
+The coefficient for bac = 0.1 variable in this fixed effects model is now  0.0042323,which is a smaller coefficient compared to the expanded model which has a positive coefficient for bac laws (4.494e-02). What is also notable is that this bac law was a significant explanatory variable in the expanded model, and in the fixed effects model it is not significant to explaining fatality rates. 
+
+In the fixed effects model, the coefficient for perse laws is -0.0534343,compared to -1.882e-02 in the expanded model. The direction is still negative, implying that the addition of per se laws decrease fatality rates. In the expanded model this coefficient wasn’t significant, but in the fixed effects model it is highly significant.
+
+The coefficient for the primary seatbelt law in this model is -0.0404917, and for the secondary seat belt law it is 0.0056980. The coefficient for the primary seatbelt law is small and positive for the expanded model , but negative in the fixed effect model. The coefficients for the secondary seat belt law are both small and positive in the fixed effects model and the expanded model. These coefficients are not significant in the expanded model, but in the fixed effects model the primary seatbelt law coefficient is significant. This implies that the primary seatbelt law has a negative effect on fatality rates.
+
+
 
 **Which set of estimates do you think is more reliable? Why do you think this?** 
 
@@ -863,25 +894,6 @@ We also ran a pFtest that rejected the null hypothesis (p-value = 2.2e-16) which
 
 ```{r}
 pFtest(within_model, expanded_mod)
-```
-```{r}
-fd_model<- plm(log(total_fatalities_rate)~year_test_fac + factor(bac) + factor(sl70plus) + factor(perse_binary) + factor(sbprim_binary) + factor(sbsec_binary) + factor(gdl_binary) + perc14_24 + log(unem) + log(vehicmilespc),
-                   data = data,
-                   index = c("state", "year_test_fac"), 
-                   effect = "individual", model = "fd")
-
-summary(fd_model)
-```
-
-
-```{r}
-pwfdtest(fd_model, data = data, h0="fe")
-```
-```{r}
-pwfdtest(fd_model, data = data, h0="fd")
-```
-```{r}
-within_model_robust <- coeftest(within_model, vcov=vcovHC(within_model,type="HC0",cluster="group"))
 ```
 
 
@@ -1059,9 +1071,6 @@ We have evidence to suggest that there is heteroscedasticity present in the erro
 
 
 ```{r}
-
-library(zoo)
-library (lmtest)
 # Breusch-Pagan Test for Heteroskedasticity
 bptest(within_model)
 
